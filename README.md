@@ -170,7 +170,10 @@ public class Chunk
 }
 ```
 
-Offsets, hashes, and token counts are each gated by an option, so you pay only for what you use.
+Offsets, hashes, and token counts are each optional, controlled by their own flag. `ComputeOffsets` and
+`ComputeTokenCounts` are on by default; `ComputeHashes` is off. Each one does real work per chunk: token
+counting runs the tokenizer again, hashing computes three digests over the chunk bytes, and offset
+resolution searches the source for the chunk. Turn off whatever you do not need and it is not computed.
 
 ## Hierarchy aware chunking
 
@@ -197,8 +200,16 @@ in next to Microsoft's readers, enrichers, and vector-store writers, and it carr
 ```csharp
 using TextChunker.Extensions.DataIngestion;
 
-IngestionChunker<string> chunker = new TextChunkerIngestionChunker(
-    new ChunkingOptions { Strategy = ChunkStrategyEnum.Recursive, Format = ContentFormatEnum.Markdown, HierarchyAware = true });
+// The same ChunkingOptions type configures the adapter. This set is tuned for markdown documents.
+ChunkingOptions options = new ChunkingOptions
+{
+    Strategy = ChunkStrategyEnum.Recursive, // split on a separator ladder, descending only when a piece overflows
+    Format = ContentFormatEnum.Markdown,    // prefer heading and fenced code boundaries when splitting
+    HierarchyAware = true,                  // stamp each chunk with its heading breadcrumb as chunk.Context
+    MaxTokens = 512                         // target chunk size in tokens
+};
+
+IngestionChunker<string> chunker = new TextChunkerIngestionChunker(options);
 
 await foreach (IngestionChunk<string> chunk in chunker.ProcessAsync(document))
 {
@@ -212,7 +223,17 @@ separate from the core package, which takes no such dependency.
 ## Observability
 
 The library never writes to the console. It exposes an `ActivitySource` and a `Meter`, both named
-`TextChunker`, so you can trace chunking and watch chunk size distributions with your existing telemetry.
+`TextChunker`, that you wire into your existing tracing and metrics.
+
+The `ActivitySource` named `TextChunker` emits one activity called `chunk` per chunking operation, spanning
+tokenizer resolution and production of the chunk stream.
+
+The `Meter` named `TextChunker` publishes:
+
+| Instrument | Type | Meaning |
+|---|---|---|
+| `textchunker.chunks_produced` | Counter (long) | Total number of chunks produced. |
+| `textchunker.chunk_tokens` | Histogram (int) | Token count of each chunk, recorded when token counting is enabled. |
 
 ## Building and testing
 
