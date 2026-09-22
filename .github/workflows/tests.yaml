@@ -25,14 +25,20 @@ jobs:
       - name: Build
         run: dotnet build src/TextChunker.sln --no-restore -c Release
 
-      - name: Run console test runner
-        run: dotnet run --project src/Test.Automated -c Release -- --results results.json
+      - name: Run console test runner (net8.0)
+        run: dotnet run --project src/Test.Automated -c Release -f net8.0 --no-build
+
+      - name: Run console test runner (net10.0)
+        run: dotnet run --project src/Test.Automated -c Release -f net10.0 --no-build -- --results results.json
 
       - name: Run xUnit tests
         run: dotnet test src/Test.Xunit -c Release --no-build
 
       - name: Run NUnit tests
         run: dotnet test src/Test.Nunit -c Release --no-build
+
+      - name: Run DataIngestion adapter tests
+        run: dotnet test src/Test.Extensions -c Release --no-build
 
       - name: Upload results
         if: always()
