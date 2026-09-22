@@ -1,0 +1,20 @@
+{
+  "recursive-prose": [
+    "The quick brown fox jumps over the lazy dog. The dog was not amused by the fox",
+    "It had been sleeping soundly for hours before the interruption occurred.",
+    "Meanwhile, a second paragraph describes an entirely different scene. Rain fell on the quiet town",
+    "Streets emptied as people retreated indoors to wait out the storm.",
+    "A final paragraph closes the sample. Chunking must preserve every meaningful word",
+    "Determinism matters more than anything else in this pipeline."
+  ],
+  "list-entry": [
+    "Preheat the oven to 220 degrees.",
+    "Combine the dry ingredients.",
+    "Fold in the wet ingredients until smooth.",
+    "Bake for twenty five minutes."
+  ],
+  "table-rows": [
+    "| Name | Role |\n|---|---|\n| Ada | Engineer |",
+    "| Name | Role |\n|---|---|\n| Bob | Designer |"
+  ]
+}

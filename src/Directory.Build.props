@@ -1,0 +1,15 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <Authors>Joel Christner</Authors>
+    <Company>Joel Christner</Company>
+    <Product>TextChunker</Product>
+    <Copyright>Copyright (c) Joel Christner</Copyright>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>1701;1702</NoWarn>
+    <PackageId>TextChunker.Extensions.DataIngestion</PackageId>
+    <RootNamespace>TextChunker.Extensions.DataIngestion</RootNamespace>
+    <Description>Integrates TextChunker with Microsoft.Extensions.DataIngestion. Provides an IngestionChunker&lt;string&gt; implementation so TextChunker can serve as the chunking stage of an IngestionPipeline.</Description>
+    <PackageTags>chunking;rag;dataingestion;microsoft-extensions-ai;ingestion;embeddings</PackageTags>
+    <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/jchristn/TextChunker</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/jchristn/TextChunker</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TextChunker\TextChunker.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\LICENSE.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DataIngestion.Abstractions" Version="10.9.0-preview.1.26411.16" />
+  </ItemGroup>
+
+</Project>
