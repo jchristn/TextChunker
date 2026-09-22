@@ -188,10 +188,52 @@ token cost is charged against the budget rather than silently inflating the chun
 
 ## Dependency injection
 
-```csharp
-using TextChunker.DependencyInjection;
+Register the chunker once and inject `IChunker` wherever you need it. `AddTextChunker` registers a single
+`Chunker` as a singleton; it holds no per-call state and is safe to share across threads. It depends only
+on `Microsoft.Extensions.DependencyInjection.Abstractions`, so it pulls in no DI runtime of its own.
 
+```csharp
+using Microsoft.Extensions.DependencyInjection;
+using TextChunker.Chunking;
+using TextChunker.DependencyInjection;
+using TextChunker.Enums;
+using TextChunker.Models;
+using TextChunker.Tokenization;
+
+IServiceCollection services = new ServiceCollection();
+
+// Default: resolve the tokenizer per call from ChunkingOptions (ModelId / TokenizerKind / ApiFormat).
 services.AddTextChunker();
+
+// Or always use one specific tokenizer, skipping model resolution.
+services.AddTextChunker(new SharpTokenTokenizerAdapter("o200k_base"));
+
+// Or resolve tokenizers from options but calibrate the token budget against a live endpoint.
+services.AddTextChunker(new MyCalibrationProbe());
+```
+
+All three overloads register `IChunker`. Consume it by constructor injection; `ChunkingOptions` stays a
+per-call argument, so one registered chunker serves every strategy and model in your application:
+
+```csharp
+public sealed class DocumentIndexer
+{
+    private readonly IChunker _Chunker;
+
+    public DocumentIndexer(IChunker chunker)
+    {
+        _Chunker = chunker;
+    }
+
+    public async Task IndexAsync(string text, CancellationToken token)
+    {
+        ChunkingOptions options = new ChunkingOptions { Strategy = ChunkStrategyEnum.Recursive, MaxTokens = 512 };
+        await foreach (Chunk chunk in _Chunker.ChunkText(text, options, token))
+        {
+            // embed and store chunk.Text, keyed by chunk.ParentGUID and chunk.Position
+        }
+    }
+}
 ```
 
 ## Microsoft.Extensions.DataIngestion
@@ -239,19 +281,36 @@ The `Meter` named `TextChunker` publishes:
 | `textchunker.chunks_produced` | Counter (long) | Total number of chunks produced. |
 | `textchunker.chunk_tokens` | Histogram (int) | Token count of each chunk, recorded when token counting is enabled. |
 
+## Try it interactively
+
+The `TextChunkerConsole` project is an interactive driver for exploring the library without writing any
+code. Run it and it walks you through the full surface:
+
+```
+dotnet run --project src/TextChunkerConsole
+```
+
+It prompts you to:
+
+1. Pick an input: sample prose, sample markdown, a long word list, a sample list, a sample table, your own
+   pasted text, or a file (choosing an access mode and encoding).
+2. Choose a strategy and tune the options: max tokens, overlap, hierarchy awareness, hashing, and the
+   tokenizer or model id.
+3. Watch chunks stream out as they are produced. Each line shows the chunk's position, token count,
+   character count, source offsets, and a preview, followed by a run summary (chunk count, total tokens,
+   mean and max chunk size, and elapsed time).
+4. Optionally export the run to a JSON file for inspection.
+
+It is the fastest way to see how a strategy, budget, format, or tokenizer choice changes the resulting
+chunks, and it exercises every input mode and strategy the library supports.
+
 ## Building and testing
 
 ```
 dotnet build src/TextChunker.sln
-dotnet run --project src/Test.Automated
+dotnet run --project src/Test.Automated -f net10.0
 dotnet test src/Test.Xunit
 dotnet test src/Test.Nunit
-```
-
-The console driver lets you feel the library by hand:
-
-```
-dotnet run --project src/TextChunkerConsole
 ```
 
 ## Documentation
