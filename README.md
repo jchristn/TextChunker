@@ -1,3 +1,5 @@
+<img src="assets/icon.png" alt="TextChunker" width="128" height="128" />
+
 # TextChunker
 
 TextChunker turns text, streams, files, lists, and tables into clean, token sized chunks for retrieval
