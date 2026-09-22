@@ -1,5 +1,7 @@
 <img src="assets/icon.png" alt="TextChunker" width="128" height="128" />
 
+[![NuGet](https://img.shields.io/nuget/v/TextChunker.svg)](https://www.nuget.org/packages/TextChunker/)
+
 # TextChunker
 
 TextChunker turns text, streams, files, lists, and tables into clean, token sized chunks for retrieval
