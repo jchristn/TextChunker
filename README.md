@@ -40,8 +40,19 @@ using TextChunker.Enums;
 
 IChunker chunker = new Chunker();
 
-await foreach (Chunk chunk in chunker.ChunkText("Your document text goes here.",
-    new ChunkingOptions { Strategy = ChunkStrategyEnum.FixedTokenCount, MaxTokens = 512, OverlapCount = 64 }))
+// ChunkingOptions carries every chunking parameter. These are the common ones; see docs/API.md for the
+// full set. Passing null instead of an options object uses sensible defaults.
+ChunkingOptions options = new ChunkingOptions
+{
+    Strategy = ChunkStrategyEnum.FixedTokenCount, // FixedTokenCount, Recursive, SentenceBased, ParagraphBased, RegexBased, list, or table
+    MaxTokens = 512,                              // target chunk size in tokens
+    OverlapCount = 64,                            // token overlap between chunks (or OverlapPercentage, or OverlapCharacters)
+    ModelId = "text-embedding-3-small",           // resolves the tokenizer family and token budget for your model
+    ComputeOffsets = true,                        // record each chunk's start and end character offsets in the source
+    ComputeHashes = false                         // optionally attach MD5, SHA1, and SHA256 to each chunk
+};
+
+await foreach (Chunk chunk in chunker.ChunkText("Your document text goes here.", options))
 {
     Console.WriteLine($"[{chunk.Position}] {chunk.TokenCount} tokens: {chunk.Text}");
 }
