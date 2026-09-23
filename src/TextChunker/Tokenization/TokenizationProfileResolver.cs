@@ -61,6 +61,7 @@ namespace TextChunker.Tokenization
                 profile.TokenizerKind = providerDefault.TokenizerKind;
                 profile.TokenizerModel = providerDefault.TokenizerModel;
                 profile.MaxInputTokens = Math.Max(1, providerDefault.MaxInputTokens);
+                profile.ReservedInputTokens = Math.Max(0, Math.Min(providerDefault.ReservedInputTokens, profile.MaxInputTokens - 1));
                 profile.ProfileSource = TokenizationProfileSourceEnum.ProviderDefault;
                 profile.UsedFallback = true;
             }

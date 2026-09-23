@@ -24,14 +24,24 @@ namespace Test.Shared.Suites
                 displayName: "Tokenization Profile Resolution",
                 cases: new List<TestCaseDescriptor>
                 {
-                    new TestCaseDescriptor("BudgetResolver", "OpenAiDefault", "OpenAI resolves to cl100k at 8192",
+                    new TestCaseDescriptor("BudgetResolver", "OpenAiDefault", "An unknown OpenAI model resolves to cl100k at 8192",
+                        executeAsync: async ct =>
+                        {
+                            TokenizationProfileResolver resolver = new TokenizationProfileResolver();
+                            ResolvedTokenizationProfile profile = await resolver.ResolveAsync(
+                                TokenizerKindEnum.Auto, ApiFormatEnum.OpenAI, "custom-openai-deployment", null, false, ct);
+                            TestSupport.Assert(profile.TokenizerKind == TokenizerKindEnum.Cl100kBase, "expected cl100k");
+                            TestSupport.Assert(profile.MaxInputTokens == 8192, "expected 8192, got " + profile.MaxInputTokens);
+                        }),
+
+                    new TestCaseDescriptor("BudgetResolver", "OpenAiKnownEmbedding", "text-embedding-3-small resolves to cl100k at 8191",
                         executeAsync: async ct =>
                         {
                             TokenizationProfileResolver resolver = new TokenizationProfileResolver();
                             ResolvedTokenizationProfile profile = await resolver.ResolveAsync(
                                 TokenizerKindEnum.Auto, ApiFormatEnum.OpenAI, "text-embedding-3-small", null, false, ct);
                             TestSupport.Assert(profile.TokenizerKind == TokenizerKindEnum.Cl100kBase, "expected cl100k");
-                            TestSupport.Assert(profile.MaxInputTokens == 8192, "expected 8192, got " + profile.MaxInputTokens);
+                            TestSupport.Assert(profile.MaxInputTokens == 8191, "expected 8191, got " + profile.MaxInputTokens);
                         }),
 
                     new TestCaseDescriptor("BudgetResolver", "GeminiDefault", "Gemini resolves to cl100k at 2048",
@@ -43,14 +53,44 @@ namespace Test.Shared.Suites
                             TestSupport.Assert(profile.MaxInputTokens == 2048, "expected 2048, got " + profile.MaxInputTokens);
                         }),
 
-                    new TestCaseDescriptor("BudgetResolver", "BertModelHeuristic", "A minilm model resolves to WordPiece at 512",
+                    new TestCaseDescriptor("BudgetResolver", "BertModelHeuristic", "An unknown bert model resolves to WordPiece at 512",
+                        executeAsync: async ct =>
+                        {
+                            TokenizationProfileResolver resolver = new TokenizationProfileResolver();
+                            ResolvedTokenizationProfile profile = await resolver.ResolveAsync(
+                                TokenizerKindEnum.Auto, ApiFormatEnum.Ollama, "custom-bert-encoder", null, false, ct);
+                            TestSupport.Assert(profile.TokenizerKind == TokenizerKindEnum.BertWordPiece, "expected WordPiece");
+                            TestSupport.Assert(profile.MaxInputTokens == 512, "expected 512, got " + profile.MaxInputTokens);
+                        }),
+
+                    new TestCaseDescriptor("BudgetResolver", "KnownMiniLm", "all-minilm resolves to WordPiece at 256",
                         executeAsync: async ct =>
                         {
                             TokenizationProfileResolver resolver = new TokenizationProfileResolver();
                             ResolvedTokenizationProfile profile = await resolver.ResolveAsync(
                                 TokenizerKindEnum.Auto, ApiFormatEnum.Ollama, "all-minilm", null, false, ct);
                             TestSupport.Assert(profile.TokenizerKind == TokenizerKindEnum.BertWordPiece, "expected WordPiece");
-                            TestSupport.Assert(profile.MaxInputTokens == 512, "expected 512, got " + profile.MaxInputTokens);
+                            TestSupport.Assert(profile.MaxInputTokens == 256, "expected 256, got " + profile.MaxInputTokens);
+                        }),
+
+                    new TestCaseDescriptor("BudgetResolver", "KnownMiniLmTagged", "all-minilm:latest strips its tag and resolves at 256",
+                        executeAsync: async ct =>
+                        {
+                            TokenizationProfileResolver resolver = new TokenizationProfileResolver();
+                            ResolvedTokenizationProfile profile = await resolver.ResolveAsync(
+                                TokenizerKindEnum.Auto, ApiFormatEnum.Ollama, "all-minilm:latest", null, false, ct);
+                            TestSupport.Assert(profile.TokenizerKind == TokenizerKindEnum.BertWordPiece, "expected WordPiece");
+                            TestSupport.Assert(profile.MaxInputTokens == 256, "expected 256, got " + profile.MaxInputTokens);
+                        }),
+
+                    new TestCaseDescriptor("BudgetResolver", "KnownNomic", "nomic-embed-text resolves to WordPiece at 2048",
+                        executeAsync: async ct =>
+                        {
+                            TokenizationProfileResolver resolver = new TokenizationProfileResolver();
+                            ResolvedTokenizationProfile profile = await resolver.ResolveAsync(
+                                TokenizerKindEnum.Auto, ApiFormatEnum.Ollama, "nomic-embed-text:v1.5", null, false, ct);
+                            TestSupport.Assert(profile.TokenizerKind == TokenizerKindEnum.BertWordPiece, "expected WordPiece");
+                            TestSupport.Assert(profile.MaxInputTokens == 2048, "expected 2048, got " + profile.MaxInputTokens);
                         }),
 
                     new TestCaseDescriptor("BudgetResolver", "O200kModel", "A GPT-4o model resolves to the o200k tokenizer",

@@ -30,11 +30,22 @@ The chunker resolves a `ResolvedTokenizationProfile` once per call using a fixed
 1. An explicit override. Setting `TokenizerKind` to a concrete family or setting `EffectiveInputBudget`
    forces the choice.
 2. A calibration probe, if one is configured and calibration is allowed.
-3. A provider default, chosen from `ApiFormat` and `ModelId`.
+3. A provider default, chosen from `ModelId` and `ApiFormat`.
 4. The global fallback, cl100k at 8192.
 
-Provider defaults map OpenAI and vLLM to cl100k at 8192, Gemini to cl100k at 2048, and BERT family model
-names to WordPiece at 512. Model name detection matches `bert`, `minilm`, `e5`, `gte`, and `bge`.
+Within the provider default step, a configurable known-model registry is consulted first. The `ModelId`
+is normalized (a provider path prefix such as `sentence-transformers/` and a version or quantization tag
+such as `:latest` or `:v1.5` are stripped) and matched against the registry, longest key first, so a
+specific entry wins over a generic one. A match takes precedence over `ApiFormat`, since the model
+identifier is the more authoritative signal. The registry ships seeded with common embedding models:
+`nomic-embed-text` (WordPiece, 2048), `all-minilm` (WordPiece, 256), `all-mpnet-base-v2` (WordPiece, 384),
+`bge`, `gte`, `e5`, and `mxbai-embed-large` (WordPiece, 512), `bge-m3` (WordPiece, 8192), and the OpenAI
+`text-embedding-3-*` and `text-embedding-ada-002` models (cl100k, 8191). Add or override entries with
+`TokenizationDefaults.RegisterKnownModel` or by mutating `TokenizationDefaults.KnownModels`.
+
+When no known-model entry matches, the API format defaults apply: OpenAI and vLLM to cl100k at 8192,
+Gemini to cl100k at 2048, and BERT family model names to WordPiece at 512. BERT family detection matches
+`bert`, `minilm`, `mpnet`, `nomic`, `mxbai`, `e5`, `gte`, and `bge`.
 
 The budget actually enforced while chunking is the smaller of your `MaxTokens` and the model's resolved
 budget, so a chunk never exceeds either limit. If you set a `ContextPrefix`, its token cost is measured

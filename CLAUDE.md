@@ -72,8 +72,8 @@ These rules are enforced by convention and `.editorconfig`. Follow them strictly
 
 ## Versioning
 
-Do not change the version number without an explicit request. The version lives in
-`src/Directory.Build.props` and is `0.1.0`.
+Do not change the version number without an explicit request. The version lives in the `<Version>`
+element of `src/Directory.Build.props`.
 
 ## Testing model
 

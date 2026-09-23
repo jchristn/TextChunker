@@ -129,9 +129,14 @@ overlap. Percentage wins over characters, which wins over count when more than o
 ## Tokenizers and budgets
 
 The chunker resolves a tokenizer and a token budget once per call. By default it uses cl100k. Set a
-`ModelId` or an `ApiFormat` and it picks the right family and budget: OpenAI and vLLM resolve to cl100k
-at 8192, GPT-4o and o-series names resolve to o200k, Gemini to cl100k at 2048, and BERT family names such
-as `all-minilm`, `bge-small`, or `e5-base` to WordPiece at 512.
+`ModelId` or an `ApiFormat` and it picks the right family and budget. Common embedding models are known
+out of the box, so their exact tokenizer and sequence length are applied automatically: `nomic-embed-text`
+to WordPiece at 2048, `all-minilm` to WordPiece at 256, `all-mpnet-base-v2` to WordPiece at 384, and
+`bge`, `gte`, `e5`, and `mxbai-embed-large` to WordPiece at 512. A provider path prefix
+(`sentence-transformers/...`) or a version or quantization tag (`nomic-embed-text:v1.5`) is stripped
+before matching. Beyond the known models, OpenAI and vLLM resolve to cl100k at 8192, GPT-4o and o-series
+names to o200k, Gemini to cl100k at 2048, and any other BERT family name to WordPiece at 512. Add or
+override entries with `TokenizationDefaults.RegisterKnownModel` at startup.
 
 For a tokenizer the resolver does not know, wrap any `Microsoft.ML.Tokenizers` tokenizer (a Hugging Face
 JSON tokenizer, or a SentencePiece model for Llama or Gemma) in `MlTokenizerAdapter` and hand it to the
@@ -142,7 +147,7 @@ ChunkingOptions options = new ChunkingOptions
 {
     Strategy = ChunkStrategyEnum.SentenceBased,
     MaxTokens = 256,
-    ModelId = "all-minilm"   // resolves to BERT WordPiece, 512 token model budget
+    ModelId = "all-minilm"   // resolves to BERT WordPiece, 256 token model budget
 };
 ```
 

@@ -5,6 +5,28 @@ All notable changes to TextChunker are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the version is below 1.0.0, any
 release may carry breaking changes.
 
+## [0.2.1] - 2026-09-23
+
+### Added
+
+- A configurable known-model registry on `TokenizationDefaults`. During profile resolution a model
+  identifier is normalized (a provider path prefix such as `sentence-transformers/` and a version or
+  quantization tag such as `:latest` or `:v1.5` are stripped) and matched against the registry, longest
+  key first, so a specific entry wins over a generic one. A match takes precedence over the API format,
+  since the model identifier is the more authoritative signal. The table is seeded with common embedding
+  models out of the box, including `nomic-embed-text` (2048), `all-MiniLM` (256), `all-mpnet-base-v2`
+  (384), `bge`, `gte`, `e5`, and `mxbai-embed-large` (512), `bge-m3` (8192), and the OpenAI
+  `text-embedding-3-*` and `text-embedding-ada-002` models (cl100k, 8191).
+- `TokenizationDefaults.RegisterKnownModel` and the mutable `TokenizationDefaults.KnownModels` dictionary,
+  so a consumer can add or override entries at startup without a code change.
+- `TokenizationDefaultEntry.ReservedInputTokens` (with a matching constructor overload). The profile
+  resolver now populates `ResolvedTokenizationProfile.ReservedInputTokens` from the resolved entry.
+
+### Changed
+
+- `TokenizationDefaults.IsBertLikeModel` now also recognizes `mpnet`, `nomic`, and `mxbai`, so those
+  models route to the BERT WordPiece tokenizer instead of falling through to cl100k.
+
 ## [0.2.0] - 2026-09-22
 
 ### Changed
