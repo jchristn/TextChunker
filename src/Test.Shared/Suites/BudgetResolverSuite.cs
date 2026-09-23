@@ -61,9 +61,11 @@ namespace Test.Shared.Suites
                                 TokenizerKindEnum.Auto, ApiFormatEnum.Ollama, "custom-bert-encoder", null, false, ct);
                             TestSupport.Assert(profile.TokenizerKind == TokenizerKindEnum.BertWordPiece, "expected WordPiece");
                             TestSupport.Assert(profile.MaxInputTokens == 512, "expected 512, got " + profile.MaxInputTokens);
+                            TestSupport.Assert(profile.ProfileSource == TokenizationProfileSourceEnum.ProviderDefault, "expected ProviderDefault source");
+                            TestSupport.Assert(profile.UsedFallback == true, "expected UsedFallback true for a heuristic guess");
                         }),
 
-                    new TestCaseDescriptor("BudgetResolver", "KnownMiniLm", "all-minilm resolves to WordPiece at 256",
+                    new TestCaseDescriptor("BudgetResolver", "KnownMiniLm", "all-minilm resolves to WordPiece at 256 reserving 2 for CLS and SEP",
                         executeAsync: async ct =>
                         {
                             TokenizationProfileResolver resolver = new TokenizationProfileResolver();
@@ -71,6 +73,8 @@ namespace Test.Shared.Suites
                                 TokenizerKindEnum.Auto, ApiFormatEnum.Ollama, "all-minilm", null, false, ct);
                             TestSupport.Assert(profile.TokenizerKind == TokenizerKindEnum.BertWordPiece, "expected WordPiece");
                             TestSupport.Assert(profile.MaxInputTokens == 256, "expected 256, got " + profile.MaxInputTokens);
+                            TestSupport.Assert(profile.ReservedInputTokens == 2, "expected 2 reserved, got " + profile.ReservedInputTokens);
+                            TestSupport.Assert(profile.EffectiveInputBudget == 254, "expected 254 effective, got " + profile.EffectiveInputBudget);
                         }),
 
                     new TestCaseDescriptor("BudgetResolver", "KnownMiniLmTagged", "all-minilm:latest strips its tag and resolves at 256",
@@ -91,6 +95,10 @@ namespace Test.Shared.Suites
                                 TokenizerKindEnum.Auto, ApiFormatEnum.Ollama, "nomic-embed-text:v1.5", null, false, ct);
                             TestSupport.Assert(profile.TokenizerKind == TokenizerKindEnum.BertWordPiece, "expected WordPiece");
                             TestSupport.Assert(profile.MaxInputTokens == 2048, "expected 2048, got " + profile.MaxInputTokens);
+                            TestSupport.Assert(profile.ReservedInputTokens == 2, "expected 2 reserved, got " + profile.ReservedInputTokens);
+                            TestSupport.Assert(profile.EffectiveInputBudget == 2046, "expected 2046 effective, got " + profile.EffectiveInputBudget);
+                            TestSupport.Assert(profile.ProfileSource == TokenizationProfileSourceEnum.KnownModel, "expected KnownModel source");
+                            TestSupport.Assert(profile.UsedFallback == false, "expected UsedFallback false for a known model");
                         }),
 
                     new TestCaseDescriptor("BudgetResolver", "O200kModel", "A GPT-4o model resolves to the o200k tokenizer",

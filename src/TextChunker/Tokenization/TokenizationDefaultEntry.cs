@@ -24,8 +24,9 @@ namespace TextChunker.Tokenization
 
         /// <summary>
         /// Tokens reserved off the top of <see cref="MaxInputTokens"/> before the effective chunking budget is
-        /// computed. Defaults to 0. Leave at 0 for BERT family WordPiece models: the tokenizer adapter already
-        /// counts the special tokens ([CLS] and [SEP]) it adds, so reserving them again would double count.
+        /// computed. Defaults to 0. BERT family WordPiece models reserve 2, because the embedding endpoint prepends
+        /// [CLS] and appends [SEP] to every input and the offline tokenizer does not count them. Reserving those two
+        /// keeps a full chunk within the model's real sequence length once the special tokens are added.
         /// </summary>
         public int ReservedInputTokens { get; set; } = 0;
 

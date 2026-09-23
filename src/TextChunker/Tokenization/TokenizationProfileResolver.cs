@@ -55,23 +55,34 @@ namespace TextChunker.Tokenization
                 UsedFallback = true
             };
 
-            TokenizationDefaultEntry? providerDefault = TokenizationDefaults.Resolve(apiFormat, modelId);
+            TokenizationDefaultEntry? knownModel = TokenizationDefaults.ResolveKnownModel(modelId);
+            TokenizationDefaultEntry? providerDefault = knownModel ?? TokenizationDefaults.Resolve(apiFormat, modelId);
             if (providerDefault != null)
             {
                 profile.TokenizerKind = providerDefault.TokenizerKind;
                 profile.TokenizerModel = providerDefault.TokenizerModel;
                 profile.MaxInputTokens = Math.Max(1, providerDefault.MaxInputTokens);
                 profile.ReservedInputTokens = Math.Max(0, Math.Min(providerDefault.ReservedInputTokens, profile.MaxInputTokens - 1));
-                profile.ProfileSource = TokenizationProfileSourceEnum.ProviderDefault;
-                profile.UsedFallback = true;
+                profile.ProfileSource = knownModel != null
+                    ? TokenizationProfileSourceEnum.KnownModel
+                    : TokenizationProfileSourceEnum.ProviderDefault;
+                profile.UsedFallback = knownModel == null;
             }
 
             if (tokenizerKind != TokenizerKindEnum.Auto)
             {
                 profile.TokenizerKind = tokenizerKind;
                 profile.TokenizerModel = DefaultModelFor(tokenizerKind);
-                if (tokenizerKind == TokenizerKindEnum.BertWordPiece && providerDefault == null)
-                    profile.MaxInputTokens = Math.Max(1, TokenizationDefaults.BertMaxInputTokens);
+                if (tokenizerKind == TokenizerKindEnum.BertWordPiece)
+                {
+                    if (providerDefault == null)
+                        profile.MaxInputTokens = Math.Max(1, TokenizationDefaults.BertMaxInputTokens);
+                    profile.ReservedInputTokens = Math.Max(0, Math.Min(TokenizationDefaults.BertReservedInputTokens, profile.MaxInputTokens - 1));
+                }
+                else
+                {
+                    profile.ReservedInputTokens = 0;
+                }
                 profile.ProfileSource = TokenizationProfileSourceEnum.Override;
                 profile.UsedFallback = false;
             }

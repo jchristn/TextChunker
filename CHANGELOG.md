@@ -5,6 +5,25 @@ All notable changes to TextChunker are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the version is below 1.0.0, any
 release may carry breaking changes.
 
+## [0.2.2] - 2026-09-23
+
+### Added
+
+- A `KnownModel` value on `TokenizationProfileSourceEnum`. An exact match in the known embedding model
+  registry now resolves with `ProfileSource = KnownModel` and `UsedFallback = false`, so consumers can
+  distinguish an authoritative known-model configuration from an API format provider default chosen by
+  name heuristics (`ProviderDefault`, still `UsedFallback = true`).
+
+### Fixed
+
+- BERT family WordPiece profiles now reserve 2 input tokens for the `[CLS]` and `[SEP]` special tokens the
+  embedding endpoint adds. The offline WordPiece tokenizer does not count these, so a chunk filled to a
+  model's full sequence length would overflow by two tokens once the endpoint wrapped it. The effective
+  chunking budget for a known BERT model is now its sequence length minus 2 (for example `all-minilm`
+  yields 254 and `nomic-embed-text` yields 2046). Introduced the configurable
+  `TokenizationDefaults.BertReservedInputTokens` (default 2), applied to the seeded known models, the
+  generic BERT heuristic, and explicit `TokenizerKind` overrides.
+
 ## [0.2.1] - 2026-09-23
 
 ### Added

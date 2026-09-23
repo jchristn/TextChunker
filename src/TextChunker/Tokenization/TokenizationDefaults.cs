@@ -42,6 +42,13 @@ namespace TextChunker.Tokenization
         public static int GlobalFallbackMaxInputTokens { get; set; } = 8192;
 
         /// <summary>
+        /// Tokens reserved for BERT family WordPiece models so that a full chunk still fits once the embedding
+        /// endpoint prepends [CLS] and appends [SEP]. The offline tokenizer does not count these special tokens, so
+        /// the effective chunking budget is the model maximum minus this reservation. Default 2.
+        /// </summary>
+        public static int BertReservedInputTokens { get; set; } = 2;
+
+        /// <summary>
         /// Configurable table of well known embedding models keyed by a lowercase match token. During resolution a
         /// model identifier is normalized (provider path prefixes and version or quantization tags are removed) and
         /// matched against these keys, longest key first, so a specific entry wins over a generic one. Add or replace
@@ -59,8 +66,8 @@ namespace TextChunker.Tokenization
         /// <param name="tokenizerKind">Tokenizer family to apply.</param>
         /// <param name="tokenizerModel">Tokenizer model or vocabulary identifier to apply.</param>
         /// <param name="maxInputTokens">Maximum accepted input tokens for the model.</param>
-        /// <param name="reservedInputTokens">Tokens reserved off the top of the maximum input budget. Leave at 0 for
-        /// BERT family models: the tokenizer adapter already counts the special tokens it adds.</param>
+        /// <param name="reservedInputTokens">Tokens reserved off the top of the maximum input budget. Use 2 for
+        /// BERT family models to leave room for the [CLS] and [SEP] special tokens the embedding endpoint adds.</param>
         /// <exception cref="ArgumentException">Thrown when the match token is null or whitespace.</exception>
         public static void RegisterKnownModel(
             string modelMatchToken,
@@ -103,11 +110,11 @@ namespace TextChunker.Tokenization
                     return new TokenizationDefaultEntry(TokenizerKindEnum.Cl100kBase, "cl100k_base", GeminiMaxInputTokens);
                 case ApiFormatEnum.Ollama:
                     return bertLike
-                        ? new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", BertMaxInputTokens)
+                        ? new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", BertMaxInputTokens, BertReservedInputTokens)
                         : new TokenizationDefaultEntry(TokenizerKindEnum.Cl100kBase, "cl100k_base", OpenAiMaxInputTokens);
                 default:
                     if (bertLike)
-                        return new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", BertMaxInputTokens);
+                        return new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", BertMaxInputTokens, BertReservedInputTokens);
                     if (o200kLike)
                         return new TokenizationDefaultEntry(TokenizerKindEnum.O200kBase, "o200k_base", OpenAiMaxInputTokens);
                     return null;
@@ -218,43 +225,43 @@ namespace TextChunker.Tokenization
             _KnownModels["text-embedding-ada-002"] = new TokenizationDefaultEntry(TokenizerKindEnum.Cl100kBase, "cl100k_base", 8191);
 
             // Nomic embedding models: BERT WordPiece, 2048 token sequence length.
-            _KnownModels["nomic-embed-text"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 2048);
-            _KnownModels["nomic-embed"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 2048);
+            _KnownModels["nomic-embed-text"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 2048, 2);
+            _KnownModels["nomic-embed"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 2048, 2);
 
             // Sentence-Transformers MiniLM models: BERT WordPiece, truncated to the model sequence length.
-            _KnownModels["all-minilm-l6-v2"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 256);
-            _KnownModels["all-minilm-l12-v2"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 256);
-            _KnownModels["paraphrase-minilm"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 128);
-            _KnownModels["all-minilm"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 256);
-            _KnownModels["minilm"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 256);
+            _KnownModels["all-minilm-l6-v2"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 256, 2);
+            _KnownModels["all-minilm-l12-v2"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 256, 2);
+            _KnownModels["paraphrase-minilm"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 128, 2);
+            _KnownModels["all-minilm"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 256, 2);
+            _KnownModels["minilm"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 256, 2);
 
             // MPNet models: BERT WordPiece, 384 or 512 token sequence length.
-            _KnownModels["all-mpnet-base-v2"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 384);
-            _KnownModels["multi-qa-mpnet-base"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512);
-            _KnownModels["mpnet"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 384);
+            _KnownModels["all-mpnet-base-v2"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 384, 2);
+            _KnownModels["multi-qa-mpnet-base"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512, 2);
+            _KnownModels["mpnet"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 384, 2);
 
             // Mixedbread mxbai embedding models: BERT WordPiece, 512 token sequence length.
-            _KnownModels["mxbai-embed-large"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512);
-            _KnownModels["mxbai-embed"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512);
+            _KnownModels["mxbai-embed-large"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512, 2);
+            _KnownModels["mxbai-embed"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512, 2);
 
             // BAAI bge models: BERT WordPiece, 512 token sequence length (bge-m3 extends to 8192).
-            _KnownModels["bge-m3"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 8192);
-            _KnownModels["bge-large"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512);
-            _KnownModels["bge-base"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512);
-            _KnownModels["bge-small"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512);
-            _KnownModels["bge"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512);
+            _KnownModels["bge-m3"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 8192, 2);
+            _KnownModels["bge-large"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512, 2);
+            _KnownModels["bge-base"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512, 2);
+            _KnownModels["bge-small"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512, 2);
+            _KnownModels["bge"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512, 2);
 
             // Alibaba gte models: BERT WordPiece, 512 token sequence length.
-            _KnownModels["gte-large"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512);
-            _KnownModels["gte-base"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512);
-            _KnownModels["gte-small"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512);
-            _KnownModels["gte"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512);
+            _KnownModels["gte-large"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512, 2);
+            _KnownModels["gte-base"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512, 2);
+            _KnownModels["gte-small"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512, 2);
+            _KnownModels["gte"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512, 2);
 
             // Microsoft E5 models: BERT WordPiece, 512 token sequence length.
-            _KnownModels["multilingual-e5"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512);
-            _KnownModels["e5-large"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512);
-            _KnownModels["e5-base"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512);
-            _KnownModels["e5-small"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512);
+            _KnownModels["multilingual-e5"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512, 2);
+            _KnownModels["e5-large"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512, 2);
+            _KnownModels["e5-base"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512, 2);
+            _KnownModels["e5-small"] = new TokenizationDefaultEntry(TokenizerKindEnum.BertWordPiece, "bert-base-uncased", 512, 2);
         }
     }
 }

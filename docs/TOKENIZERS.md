@@ -43,12 +43,19 @@ identifier is the more authoritative signal. The registry ships seeded with comm
 `text-embedding-3-*` and `text-embedding-ada-002` models (cl100k, 8191). Add or override entries with
 `TokenizationDefaults.RegisterKnownModel` or by mutating `TokenizationDefaults.KnownModels`.
 
-When no known-model entry matches, the API format defaults apply: OpenAI and vLLM to cl100k at 8192,
-Gemini to cl100k at 2048, and BERT family model names to WordPiece at 512. BERT family detection matches
-`bert`, `minilm`, `mpnet`, `nomic`, `mxbai`, `e5`, `gte`, and `bge`.
+A known-model match resolves with `ProfileSource = KnownModel` and `UsedFallback = false`, marking it an
+authoritative configuration rather than a guess. When no known-model entry matches, the API format defaults
+apply: OpenAI and vLLM to cl100k at 8192, Gemini to cl100k at 2048, and BERT family model names to WordPiece
+at 512. These report `ProfileSource = ProviderDefault` with `UsedFallback = true`. BERT family detection
+matches `bert`, `minilm`, `mpnet`, `nomic`, `mxbai`, `e5`, `gte`, and `bge`.
+
+BERT family WordPiece models reserve 2 tokens (`TokenizationDefaults.BertReservedInputTokens`) for the
+`[CLS]` and `[SEP]` special tokens the embedding endpoint adds. The embedded offline tokenizer does not
+count these, so the effective budget is the model's sequence length minus 2 (for example `all-minilm`
+resolves to a 256 token model with a 254 token effective budget). cl100k and o200k models reserve nothing.
 
 The budget actually enforced while chunking is the smaller of your `MaxTokens` and the model's resolved
-budget, so a chunk never exceeds either limit. If you set a `ContextPrefix`, its token cost is measured
+effective budget, so a chunk never exceeds either limit. If you set a `ContextPrefix`, its token cost is measured
 once and subtracted from the working budget so a prefixed chunk still fits.
 
 ## The strict slice guard

@@ -75,7 +75,9 @@ namespace TextChunker.Models
         public TokenizationProfileSourceEnum ProfileSource { get; set; } = TokenizationProfileSourceEnum.GlobalFallback;
 
         /// <summary>
-        /// True when resolution fell back to a provider default or the global fallback.
+        /// True when resolution fell back to an API format provider default or the global fallback. False for an
+        /// explicit override, a calibration result, or an exact known embedding model match, since those are
+        /// authoritative rather than guessed. Inspect <see cref="ProfileSource"/> for the exact origin.
         /// </summary>
         public bool UsedFallback { get; set; } = false;
 
