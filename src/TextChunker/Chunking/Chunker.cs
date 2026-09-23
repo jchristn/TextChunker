@@ -145,13 +145,13 @@ namespace TextChunker.Chunking
 
             SemanticCellRequest request = new SemanticCellRequest
             {
-                Type = AtomTypeEnum.List,
+                Type = ContentTypeEnum.List,
                 ParentGUID = options.ParentGUID != Guid.Empty ? options.ParentGUID : null
             };
             if (ordered) request.OrderedList = list;
             else request.UnorderedList = list;
 
-            ChunkingOptions listOptions = WithInputType(options, AtomTypeEnum.List);
+            ChunkingOptions listOptions = WithInputType(options, ContentTypeEnum.List);
             await foreach (Chunk chunk in ChunkCoreAsync(request, listOptions, null, token).ConfigureAwait(false))
                 yield return chunk;
         }
@@ -168,7 +168,7 @@ namespace TextChunker.Chunking
             List<List<string>> table = rows.Select(row => row.ToList()).ToList();
             GuardInputSize(table.Sum(r => r.Sum(c => (c ?? string.Empty).Length)), options);
 
-            ChunkingOptions tableOptions = WithInputType(options, AtomTypeEnum.Table);
+            ChunkingOptions tableOptions = WithInputType(options, ContentTypeEnum.Table);
             if (tableOptions.Strategy != ChunkStrategyEnum.Row
                 && tableOptions.Strategy != ChunkStrategyEnum.RowWithHeaders
                 && tableOptions.Strategy != ChunkStrategyEnum.RowGroupWithHeaders
@@ -180,7 +180,7 @@ namespace TextChunker.Chunking
 
             SemanticCellRequest request = new SemanticCellRequest
             {
-                Type = AtomTypeEnum.Table,
+                Type = ContentTypeEnum.Table,
                 Table = table,
                 ParentGUID = options.ParentGUID != Guid.Empty ? options.ParentGUID : null
             };
@@ -481,15 +481,15 @@ namespace TextChunker.Chunking
         {
             return new SemanticCellRequest
             {
-                Type = options.InputType == AtomTypeEnum.List || options.InputType == AtomTypeEnum.Table
-                    ? AtomTypeEnum.Text
+                Type = options.InputType == ContentTypeEnum.List || options.InputType == ContentTypeEnum.Table
+                    ? ContentTypeEnum.Text
                     : options.InputType,
                 Text = text,
                 ParentGUID = options.ParentGUID != Guid.Empty ? options.ParentGUID : null
             };
         }
 
-        private static ChunkingOptions WithInputType(ChunkingOptions options, AtomTypeEnum type)
+        private static ChunkingOptions WithInputType(ChunkingOptions options, ContentTypeEnum type)
         {
             if (options.InputType == type) return options;
 

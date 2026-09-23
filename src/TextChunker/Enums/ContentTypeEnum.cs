@@ -1,9 +1,9 @@
 namespace TextChunker.Enums
 {
     /// <summary>
-    /// Type of semantic atom being chunked. Drives strategy routing.
+    /// Type of content being chunked. Drives strategy routing.
     /// </summary>
-    public enum AtomTypeEnum
+    public enum ContentTypeEnum
     {
         /// <summary>Plain text content.</summary>
         Text,

@@ -69,7 +69,7 @@ namespace Test.Shared.Suites
                             ChunkingOptions options = new ChunkingOptions { Strategy = ChunkStrategyEnum.FixedTokenCount, MaxTokens = 32 };
 
                             IReadOnlyList<Chunk> fromText = TestSupport.Collect(chunker.ChunkText(TestSupport.MultiParagraph, options, ct));
-                            SemanticCellRequest request = new SemanticCellRequest { Type = AtomTypeEnum.Text, Text = TestSupport.MultiParagraph };
+                            SemanticCellRequest request = new SemanticCellRequest { Type = ContentTypeEnum.Text, Text = TestSupport.MultiParagraph };
                             IReadOnlyList<Chunk> fromRequest = TestSupport.Collect(chunker.ChunkRequest(request, options, ct));
 
                             TestSupport.Assert(fromText.Count == fromRequest.Count, "request chunk count differs from text");

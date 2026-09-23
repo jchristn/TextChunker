@@ -5,6 +5,15 @@ All notable changes to TextChunker are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the version is below 1.0.0, any
 release may carry breaking changes.
 
+## [0.2.0] - 2026-09-22
+
+### Changed
+
+- **Breaking:** renamed `AtomTypeEnum` to `ContentTypeEnum`. The enum describes the content type of an
+  input (text, list, table, and so on) and drives strategy routing. The old name was inherited
+  terminology that did not fit a chunking library. Update `SemanticCellRequest.Type` and
+  `ChunkingOptions.InputType` assignments from `AtomTypeEnum.X` to `ContentTypeEnum.X`.
+
 ## [0.1.0] - 2026-09-21
 
 The first release. A best-of-breed, tokenizer-agnostic chunking library for retrieval augmented generation

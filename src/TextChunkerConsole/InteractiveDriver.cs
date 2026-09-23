@@ -64,13 +64,13 @@ namespace TextChunkerConsole
             switch (choice)
             {
                 case "1":
-                    await RunTextAsync(SampleCorpora.Prose(), AtomTypeEnum.Text).ConfigureAwait(false);
+                    await RunTextAsync(SampleCorpora.Prose(), ContentTypeEnum.Text).ConfigureAwait(false);
                     break;
                 case "2":
-                    await RunTextAsync(SampleCorpora.Markdown(), AtomTypeEnum.Text).ConfigureAwait(false);
+                    await RunTextAsync(SampleCorpora.Markdown(), ContentTypeEnum.Text).ConfigureAwait(false);
                     break;
                 case "3":
-                    await RunTextAsync(SampleCorpora.LongWordList(), AtomTypeEnum.Text).ConfigureAwait(false);
+                    await RunTextAsync(SampleCorpora.LongWordList(), ContentTypeEnum.Text).ConfigureAwait(false);
                     break;
                 case "4":
                     await RunListAsync(SampleCorpora.ListItems()).ConfigureAwait(false);
@@ -81,7 +81,7 @@ namespace TextChunkerConsole
                 case "6":
                     Console.Write("Enter text: ");
                     string? typed = Console.ReadLine();
-                    if (!string.IsNullOrEmpty(typed)) await RunTextAsync(typed, AtomTypeEnum.Text).ConfigureAwait(false);
+                    if (!string.IsNullOrEmpty(typed)) await RunTextAsync(typed, ContentTypeEnum.Text).ConfigureAwait(false);
                     break;
                 case "7":
                     Console.Write("File path: ");
@@ -94,7 +94,7 @@ namespace TextChunkerConsole
             }
         }
 
-        private async Task RunTextAsync(string text, AtomTypeEnum inputType)
+        private async Task RunTextAsync(string text, ContentTypeEnum inputType)
         {
             ChunkingOptions options = PromptTextOptions();
             options.InputType = inputType;

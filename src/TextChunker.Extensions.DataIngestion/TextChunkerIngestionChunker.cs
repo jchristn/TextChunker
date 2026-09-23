@@ -64,7 +64,7 @@ namespace TextChunker.Extensions.DataIngestion
             string markdown = IngestionDocumentMarkdown.Build(document);
             SemanticCellRequest request = new SemanticCellRequest
             {
-                Type = AtomTypeEnum.Text,
+                Type = ContentTypeEnum.Text,
                 Text = markdown
             };
 

@@ -28,17 +28,17 @@ namespace Test.Shared.Suites
                         {
                             SemanticCellRequest root = new SemanticCellRequest
                             {
-                                Type = AtomTypeEnum.Text,
+                                Type = ContentTypeEnum.Text,
                                 Text = "Root section introduces the topic with enough words to form a chunk on its own."
                             };
                             SemanticCellRequest childText = new SemanticCellRequest
                             {
-                                Type = AtomTypeEnum.Text,
+                                Type = ContentTypeEnum.Text,
                                 Text = "Child section adds supporting detail and also has enough words to chunk cleanly."
                             };
                             SemanticCellRequest childList = new SemanticCellRequest
                             {
-                                Type = AtomTypeEnum.List,
+                                Type = ContentTypeEnum.List,
                                 OrderedList = new List<string> { "first point", "second point", "third point" }
                             };
                             root.Children = new List<SemanticCellRequest> { childText, childList };

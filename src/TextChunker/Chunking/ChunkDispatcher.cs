@@ -58,12 +58,12 @@ namespace TextChunker.Chunking
             };
         }
 
-        internal static bool IsTextType(AtomTypeEnum type)
+        internal static bool IsTextType(ContentTypeEnum type)
         {
             switch (type)
             {
-                case AtomTypeEnum.List:
-                case AtomTypeEnum.Table:
+                case ContentTypeEnum.List:
+                case ContentTypeEnum.Table:
                     return false;
                 default:
                     return true;
@@ -107,9 +107,9 @@ namespace TextChunker.Chunking
         {
             switch (request.Type)
             {
-                case AtomTypeEnum.List:
+                case ContentTypeEnum.List:
                     return ChunkList(request, config, tokenizer, tokenBudget);
-                case AtomTypeEnum.Table:
+                case ContentTypeEnum.Table:
                     return ChunkTableRequest(request, config, tokenizer, tokenBudget);
                 default:
                     return DispatchText(request.Text ?? string.Empty, config, tokenizer, tokenBudget);

@@ -27,10 +27,10 @@ namespace TextChunker.Models
         public ChunkStrategyEnum Strategy { get; set; } = ChunkStrategyEnum.FixedTokenCount;
 
         /// <summary>
-        /// The atom type of the input, which drives strategy routing. Default Text. The structured entry points
-        /// set this automatically.
+        /// The content type of the input, which drives strategy routing. Default Text. The structured entry
+        /// points set this automatically.
         /// </summary>
-        public AtomTypeEnum InputType { get; set; } = AtomTypeEnum.Text;
+        public ContentTypeEnum InputType { get; set; } = ContentTypeEnum.Text;
 
         /// <summary>
         /// Desired chunk size in tokens. Default 512. Minimum 1.

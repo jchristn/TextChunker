@@ -92,7 +92,7 @@ namespace Test.Shared.Suites
                         {
                             SemanticCellRequest request = new SemanticCellRequest
                             {
-                                Type = AtomTypeEnum.Text,
+                                Type = ContentTypeEnum.Text,
                                 Text = TestSupport.WordCorpus(120),
                                 Labels = new List<string> { "alpha", "beta" },
                                 Tags = new Dictionary<string, string> { { "source", "unit-test" }, { "lang", "en" } }

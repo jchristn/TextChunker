@@ -29,10 +29,10 @@ namespace TextChunker.Models
         /// <summary>
         /// Type of the content in this cell. Drives strategy routing.
         /// </summary>
-        public AtomTypeEnum Type { get; set; } = AtomTypeEnum.Text;
+        public ContentTypeEnum Type { get; set; } = ContentTypeEnum.Text;
 
         /// <summary>
-        /// Text content, used for text atom types.
+        /// Text content, used for text content types.
         /// </summary>
         public string? Text { get; set; } = null;
 
