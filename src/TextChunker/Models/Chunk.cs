@@ -23,7 +23,7 @@ namespace TextChunker.Models
 
         /// <summary>
         /// Identifier of the parent this chunk was produced from (the caller supplied parent, or the parent of
-        /// the source cell). Null when no parent was supplied.
+        /// the source content). Null when no parent was supplied.
         /// </summary>
         public Guid? ParentGUID { get; set; } = null;
 

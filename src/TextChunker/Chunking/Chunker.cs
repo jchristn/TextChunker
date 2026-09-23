@@ -63,7 +63,7 @@ namespace TextChunker.Chunking
             string source = text ?? string.Empty;
             GuardInputSize(source.Length, options);
 
-            SemanticCellRequest request = BuildTextRequest(source, options);
+            ContentRequest request = BuildTextRequest(source, options);
             await foreach (Chunk chunk in ChunkCoreAsync(request, options, source, token).ConfigureAwait(false))
                 yield return chunk;
         }
@@ -90,7 +90,7 @@ namespace TextChunker.Chunking
             }
 
             GuardInputSize(source.Length, options);
-            SemanticCellRequest request = BuildTextRequest(source, options);
+            ContentRequest request = BuildTextRequest(source, options);
             await foreach (Chunk chunk in ChunkCoreAsync(request, options, source, token).ConfigureAwait(false))
                 yield return chunk;
         }
@@ -125,7 +125,7 @@ namespace TextChunker.Chunking
             }
 
             GuardInputSize(source.Length, options);
-            SemanticCellRequest request = BuildTextRequest(source, options);
+            ContentRequest request = BuildTextRequest(source, options);
             await foreach (Chunk chunk in ChunkCoreAsync(request, options, source, token).ConfigureAwait(false))
                 yield return chunk;
         }
@@ -143,7 +143,7 @@ namespace TextChunker.Chunking
             List<string> list = items.ToList();
             GuardInputSize(list.Sum(i => (i ?? string.Empty).Length), options);
 
-            SemanticCellRequest request = new SemanticCellRequest
+            ContentRequest request = new ContentRequest
             {
                 Type = ContentTypeEnum.List,
                 ParentGUID = options.ParentGUID != Guid.Empty ? options.ParentGUID : null
@@ -178,7 +178,7 @@ namespace TextChunker.Chunking
                 tableOptions.Strategy = ChunkStrategyEnum.RowWithHeaders;
             }
 
-            SemanticCellRequest request = new SemanticCellRequest
+            ContentRequest request = new ContentRequest
             {
                 Type = ContentTypeEnum.Table,
                 Table = table,
@@ -191,7 +191,7 @@ namespace TextChunker.Chunking
 
         /// <inheritdoc />
         public async IAsyncEnumerable<Chunk> ChunkRequest(
-            SemanticCellRequest request,
+            ContentRequest request,
             ChunkingOptions? options = null,
             [EnumeratorCancellation] CancellationToken token = default)
         {
@@ -206,7 +206,7 @@ namespace TextChunker.Chunking
 
             if (request.Children != null)
             {
-                foreach (SemanticCellRequest child in request.Children)
+                foreach (ContentRequest child in request.Children)
                 {
                     token.ThrowIfCancellationRequested();
                     await foreach (Chunk chunk in ChunkRequest(child, options, token).ConfigureAwait(false))
@@ -266,7 +266,7 @@ namespace TextChunker.Chunking
         }
 
         private async IAsyncEnumerable<Chunk> ChunkCoreAsync(
-            SemanticCellRequest request,
+            ContentRequest request,
             ChunkingOptions options,
             string? offsetSource,
             [EnumeratorCancellation] CancellationToken token)
@@ -437,7 +437,7 @@ namespace TextChunker.Chunking
             return chunk;
         }
 
-        private static void CopyRequestMetadata(Chunk chunk, SemanticCellRequest request)
+        private static void CopyRequestMetadata(Chunk chunk, ContentRequest request)
         {
             if (request.Labels != null && request.Labels.Count > 0)
                 chunk.Labels = new List<string>(request.Labels);
@@ -470,16 +470,16 @@ namespace TextChunker.Chunking
             return Math.Max(1, Math.Min(options.MaxTokens, profile.EffectiveInputBudget));
         }
 
-        private static Guid? ResolveParent(SemanticCellRequest request, ChunkingOptions options)
+        private static Guid? ResolveParent(ContentRequest request, ChunkingOptions options)
         {
             if (options.ParentGUID != Guid.Empty) return options.ParentGUID;
             if (request.ParentGUID.HasValue && request.ParentGUID.Value != Guid.Empty) return request.ParentGUID.Value;
             return null;
         }
 
-        private static SemanticCellRequest BuildTextRequest(string text, ChunkingOptions options)
+        private static ContentRequest BuildTextRequest(string text, ChunkingOptions options)
         {
-            return new SemanticCellRequest
+            return new ContentRequest
             {
                 Type = options.InputType == ContentTypeEnum.List || options.InputType == ContentTypeEnum.Table
                     ? ContentTypeEnum.Text

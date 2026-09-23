@@ -11,8 +11,17 @@ release may carry breaking changes.
 
 - **Breaking:** renamed `AtomTypeEnum` to `ContentTypeEnum`. The enum describes the content type of an
   input (text, list, table, and so on) and drives strategy routing. The old name was inherited
-  terminology that did not fit a chunking library. Update `SemanticCellRequest.Type` and
+  terminology that did not fit a chunking library. Update `ContentRequest.Type` and
   `ChunkingOptions.InputType` assignments from `AtomTypeEnum.X` to `ContentTypeEnum.X`.
+- **Breaking:** renamed `SemanticCellRequest` to `ContentRequest`. It is the structured content input to
+  `ChunkRequest`; "semantic cell" was inherited graph terminology. The members are unchanged; only the type
+  name and its "cell" wording changed to "content".
+
+### Removed
+
+- **Breaking:** removed `BatchLimitModeEnum` and the `BatchLimitMode` property from
+  `ResolvedTokenizationProfile` and `TokenizationCalibrationResult`. Batch limit mode described how an
+  embedding endpoint applies token limits across batched inputs, which the chunker never used.
 
 ## [0.1.0] - 2026-09-21
 

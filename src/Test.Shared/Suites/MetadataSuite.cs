@@ -90,7 +90,7 @@ namespace Test.Shared.Suites
                     new TestCaseDescriptor("Metadata", "LabelsAndTagsEchoed", "Request labels and tags are echoed onto every chunk",
                         executeAsync: ct =>
                         {
-                            SemanticCellRequest request = new SemanticCellRequest
+                            ContentRequest request = new ContentRequest
                             {
                                 Type = ContentTypeEnum.Text,
                                 Text = TestSupport.WordCorpus(120),

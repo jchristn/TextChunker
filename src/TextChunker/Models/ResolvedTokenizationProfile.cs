@@ -70,11 +70,6 @@ namespace TextChunker.Models
         }
 
         /// <summary>
-        /// Batch limit behavior for the active endpoint.
-        /// </summary>
-        public BatchLimitModeEnum BatchLimitMode { get; set; } = BatchLimitModeEnum.PerInput;
-
-        /// <summary>
         /// Source of the resolved profile.
         /// </summary>
         public TokenizationProfileSourceEnum ProfileSource { get; set; } = TokenizationProfileSourceEnum.GlobalFallback;

@@ -15,7 +15,7 @@ accepts a trailing `CancellationToken`.
 | `ChunkFile(string, ChunkingOptions?, FileChunkingOptions?, CancellationToken)` | Chunk a file by name, with an access mode. |
 | `ChunkList(IEnumerable<string>, bool ordered, ChunkingOptions?, CancellationToken)` | Chunk a list. |
 | `ChunkTable(IReadOnlyList<IReadOnlyList<string>>, ChunkingOptions?, CancellationToken)` | Chunk a table. Row zero is the header. |
-| `ChunkRequest(SemanticCellRequest, ChunkingOptions?, CancellationToken)` | Chunk a structured request, including a hierarchy of child cells. |
+| `ChunkRequest(ContentRequest, ChunkingOptions?, CancellationToken)` | Chunk a structured request, including a hierarchy of child content. |
 
 Passing `null` options uses a default `ChunkingOptions`.
 

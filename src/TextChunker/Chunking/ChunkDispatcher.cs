@@ -16,7 +16,7 @@ namespace TextChunker.Chunking
     internal static class ChunkDispatcher
     {
         internal static List<RawPiece> Produce(
-            SemanticCellRequest request,
+            ContentRequest request,
             ChunkingOptions options,
             ITokenizerAdapter tokenizer,
             int workingBudget)
@@ -100,7 +100,7 @@ namespace TextChunker.Chunking
         }
 
         private static List<string> GetRawChunks(
-            SemanticCellRequest request,
+            ContentRequest request,
             ChunkingConfiguration config,
             ITokenizerAdapter tokenizer,
             int tokenBudget)
@@ -149,7 +149,7 @@ namespace TextChunker.Chunking
             }
         }
 
-        private static List<string> ChunkList(SemanticCellRequest request, ChunkingConfiguration config, ITokenizerAdapter tokenizer, int tokenBudget)
+        private static List<string> ChunkList(ContentRequest request, ChunkingConfiguration config, ITokenizerAdapter tokenizer, int tokenBudget)
         {
             List<string>? items = request.OrderedList ?? request.UnorderedList;
             if (items == null || items.Count == 0) return new List<string>();
@@ -168,7 +168,7 @@ namespace TextChunker.Chunking
             }
         }
 
-        private static List<string> ChunkTableRequest(SemanticCellRequest request, ChunkingConfiguration config, ITokenizerAdapter tokenizer, int tokenBudget)
+        private static List<string> ChunkTableRequest(ContentRequest request, ChunkingConfiguration config, ITokenizerAdapter tokenizer, int tokenBudget)
         {
             if (request.Table == null || request.Table.Count == 0) return new List<string>();
 

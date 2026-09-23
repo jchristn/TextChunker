@@ -2,7 +2,6 @@ namespace Test.Shared
 {
     using System.Threading;
     using System.Threading.Tasks;
-    using TextChunker.Enums;
     using TextChunker.Models;
     using TextChunker.Tokenization;
 
@@ -30,8 +29,7 @@ namespace Test.Shared
         {
             TokenizationCalibrationResult result = new TokenizationCalibrationResult
             {
-                EffectiveInputBudget = _Budget,
-                BatchLimitMode = BatchLimitModeEnum.PerInput
+                EffectiveInputBudget = _Budget
             };
             return Task.FromResult<TokenizationCalibrationResult?>(result);
         }

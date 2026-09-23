@@ -50,7 +50,7 @@ This matters most for WordPiece, where decoding and encoding are not symmetric, 
 
 If you serve models behind an endpoint whose true accepted budget differs from the provider default,
 implement `ITokenizerCalibrationProbe`. The resolver calls it with the provisional profile and a tokenizer
-and takes the discovered budget and batch limit mode. The core library performs no network access itself,
+and takes the discovered budget. The core library performs no network access itself,
 so the transport stays in your code and the package stays dependency light.
 
 ```csharp

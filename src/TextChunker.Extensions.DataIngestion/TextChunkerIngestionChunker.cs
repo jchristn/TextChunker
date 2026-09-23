@@ -62,7 +62,7 @@ namespace TextChunker.Extensions.DataIngestion
             if (document == null) throw new ArgumentNullException(nameof(document));
 
             string markdown = IngestionDocumentMarkdown.Build(document);
-            SemanticCellRequest request = new SemanticCellRequest
+            ContentRequest request = new ContentRequest
             {
                 Type = ContentTypeEnum.Text,
                 Text = markdown

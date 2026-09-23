@@ -61,12 +61,12 @@ namespace TextChunker.Chunking
         IAsyncEnumerable<Chunk> ChunkTable(IReadOnlyList<IReadOnlyList<string>> rows, ChunkingOptions? options = null, CancellationToken token = default);
 
         /// <summary>
-        /// Chunk a fully formed structured request, including a hierarchy of child cells.
+        /// Chunk a fully formed structured request, including a hierarchy of child content.
         /// </summary>
         /// <param name="request">Structured request.</param>
         /// <param name="options">Chunking options, or null to use defaults.</param>
         /// <param name="token">Cancellation token.</param>
         /// <returns>An asynchronous stream of chunks.</returns>
-        IAsyncEnumerable<Chunk> ChunkRequest(SemanticCellRequest request, ChunkingOptions? options = null, CancellationToken token = default);
+        IAsyncEnumerable<Chunk> ChunkRequest(ContentRequest request, ChunkingOptions? options = null, CancellationToken token = default);
     }
 }

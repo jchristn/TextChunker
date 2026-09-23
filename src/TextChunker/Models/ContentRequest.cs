@@ -5,29 +5,29 @@ namespace TextChunker.Models
     using TextChunker.Enums;
 
     /// <summary>
-    /// A structured chunking request describing one content cell and, optionally, a hierarchy of child cells.
-    /// Use this to chunk pre parsed content that carries shape, such as lists, tables, and document hierarchies,
-    /// with parent identity and labels flowing through to the produced chunks.
+    /// A structured chunking request describing one piece of content and, optionally, a hierarchy of child
+    /// content. Use this to chunk pre parsed content that carries shape, such as lists, tables, and document
+    /// hierarchies, with parent identity and labels flowing through to the produced chunks.
     /// </summary>
-    public class SemanticCellRequest
+    public class ContentRequest
     {
         /// <summary>
-        /// Unique identifier for this cell. Auto generated when not supplied.
+        /// Unique identifier for this content. Auto generated when not supplied.
         /// </summary>
         public Guid GUID { get; set; } = Guid.NewGuid();
 
         /// <summary>
-        /// Parent cell identifier, or null for a root cell.
+        /// Parent identifier, or null when this content has no parent.
         /// </summary>
         public Guid? ParentGUID { get; set; } = null;
 
         /// <summary>
-        /// Child cells forming a hierarchy. Each is chunked in document order after this cell's own content.
+        /// Child content forming a hierarchy. Each is chunked in document order after this content's own text.
         /// </summary>
-        public List<SemanticCellRequest>? Children { get; set; } = null;
+        public List<ContentRequest>? Children { get; set; } = null;
 
         /// <summary>
-        /// Type of the content in this cell. Drives strategy routing.
+        /// Type of this content. Drives strategy routing.
         /// </summary>
         public ContentTypeEnum Type { get; set; } = ContentTypeEnum.Text;
 

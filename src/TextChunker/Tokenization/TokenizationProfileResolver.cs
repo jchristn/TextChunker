@@ -100,8 +100,6 @@ namespace TextChunker.Tokenization
                     {
                         profile.EffectiveInputBudget = Math.Max(1, Math.Min(profile.MaxInputTokens, result.EffectiveInputBudget));
                         profile.ReservedInputTokens = Math.Max(0, profile.MaxInputTokens - profile.EffectiveInputBudget);
-                        if (result.BatchLimitMode != BatchLimitModeEnum.Unknown)
-                            profile.BatchLimitMode = result.BatchLimitMode;
                         profile.ProfileSource = TokenizationProfileSourceEnum.Calibration;
                         profile.UsedFallback = false;
                     }

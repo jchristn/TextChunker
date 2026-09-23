@@ -97,7 +97,7 @@ namespace Test.Shared.Suites
                         executeAsync: async ct =>
                         {
                             Chunker chunker = new Chunker();
-                            SemanticCellRequest request = new SemanticCellRequest { Type = ContentTypeEnum.Text, Text = TestSupport.WordCorpus(30000) };
+                            ContentRequest request = new ContentRequest { Type = ContentTypeEnum.Text, Text = TestSupport.WordCorpus(30000) };
                             IReadOnlyList<Chunk> chunks = TestSupport.Collect(chunker.ChunkRequest(request, new ChunkingOptions { Strategy = ChunkStrategyEnum.FixedTokenCount, MaxTokens = 256 }, ct));
                             TestSupport.Assert(chunks.Count > 50, "expected many chunks from a large request, got " + chunks.Count);
                             foreach (Chunk c in chunks)
@@ -105,14 +105,14 @@ namespace Test.Shared.Suites
                             await System.Threading.Tasks.Task.CompletedTask;
                         }),
 
-                    new TestCaseDescriptor("LargeInput", "RequestWithManyChildren", "A request with a hundred child cells chunks all of them within budget",
+                    new TestCaseDescriptor("LargeInput", "RequestWithManyChildren", "A request with a hundred child content items chunks all of them within budget",
                         executeAsync: async ct =>
                         {
                             Chunker chunker = new Chunker();
-                            SemanticCellRequest root = new SemanticCellRequest { Type = ContentTypeEnum.Text, Text = "Root introduction with several words to fill a chunk." };
-                            List<SemanticCellRequest> children = new List<SemanticCellRequest>();
+                            ContentRequest root = new ContentRequest { Type = ContentTypeEnum.Text, Text = "Root introduction with several words to fill a chunk." };
+                            List<ContentRequest> children = new List<ContentRequest>();
                             for (int i = 0; i < 100; i++)
-                                children.Add(new SemanticCellRequest { Type = ContentTypeEnum.Text, Text = "Child section " + i + " has enough words present here to produce at least one chunk of content." });
+                                children.Add(new ContentRequest { Type = ContentTypeEnum.Text, Text = "Child section " + i + " has enough words present here to produce at least one chunk of content." });
                             root.Children = children;
 
                             IReadOnlyList<Chunk> chunks = TestSupport.Collect(chunker.ChunkRequest(root, new ChunkingOptions { Strategy = ChunkStrategyEnum.FixedTokenCount, MaxTokens = 64 }, ct));

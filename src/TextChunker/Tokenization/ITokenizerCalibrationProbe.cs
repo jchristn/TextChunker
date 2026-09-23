@@ -12,7 +12,7 @@ namespace TextChunker.Tokenization
     public interface ITokenizerCalibrationProbe
     {
         /// <summary>
-        /// Measure the endpoint and return the discovered budget and batch limit behavior.
+        /// Measure the endpoint and return the discovered budget.
         /// </summary>
         /// <param name="provisionalProfile">The profile resolved so far from options and provider defaults.</param>
         /// <param name="tokenizer">A tokenizer adapter built for the provisional profile.</param>
