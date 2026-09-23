@@ -157,7 +157,7 @@ package opens no network connections on its own.
 public class Chunk
 {
     public Guid GUID;              // unique per chunk
-    public Guid ParentGUID;        // groups chunks from the same source
+    public Guid? ParentGUID;       // parent identifier, or null when no parent was supplied
     public int Position;           // zero based ordinal within the parent
     public string Text;
     public int TokenCount;

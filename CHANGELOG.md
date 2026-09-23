@@ -9,6 +9,9 @@ release may carry breaking changes.
 
 ### Changed
 
+- **Breaking:** `Chunk.ParentGUID` is now `Guid?` (nullable) and defaults to `null`. It is a parent
+  identifier (null when no parent was supplied), and the chunker no longer backfills it with the source
+  content's own GUID. Set `ChunkingOptions.ParentGUID` or the request's `ParentGUID` to stamp a value.
 - **Breaking:** renamed `AtomTypeEnum` to `ContentTypeEnum`. The enum describes the content type of an
   input (text, list, table, and so on) and drives strategy routing. The old name was inherited
   terminology that did not fit a chunking library. Update `ContentRequest.Type` and

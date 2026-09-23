@@ -6,8 +6,8 @@
     <NoWarn>1701;1702</NoWarn>
     <PackageId>TextChunker</PackageId>
     <RootNamespace>TextChunker</RootNamespace>
-    <Description>Best-of-breed, tokenizer-agnostic text chunking for RAG and embedding pipelines. Async streaming API, exact token-boundary slicing, sentence/paragraph/regex/list/table strategies, and pluggable cl100k and BERT WordPiece tokenizers with per-model budget resolution.</Description>
-    <PackageTags>chunking;rag;tokenizer;embeddings;nlp;text;wordpiece;cl100k;semantic</PackageTags>
+    <Description>Best-of-breed, tokenizer-agnostic text chunking for RAG and embedding pipelines. Async streaming API, exact token-boundary slicing, a recursive splitter plus fixed/sentence/paragraph/regex/list/table strategies, and pluggable cl100k, o200k, and BERT WordPiece tokenizers with per-model budget resolution.</Description>
+    <PackageTags>chunking;rag;tokenizer;embeddings;nlp;text;wordpiece;cl100k;o200k;recursive;semantic</PackageTags>
     <PackageLicenseFile>LICENSE.md</PackageLicenseFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageProjectUrl>https://github.com/jchristn/TextChunker</PackageProjectUrl>
