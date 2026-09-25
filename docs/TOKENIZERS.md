@@ -7,9 +7,9 @@ the model you are targeting.
 
 Three tokenizer families ship out of the box. cl100k and o200k, backed by SharpToken, match OpenAI style
 BPE models: cl100k for GPT-3.5, GPT-4, and text-embedding-3, and o200k for GPT-4o, GPT-4.1, the o-series,
-and GPT-5. BERT WordPiece, backed by `Microsoft.ML.Tokenizers`, matches BERT family embedding models such
-as MiniLM, BGE, E5, and GTE. The WordPiece vocabulary (`bert-base-uncased`) is embedded in the assembly,
-so token counts are correct offline with no external file to deploy.
+and GPT-5. BERT WordPiece matches BERT family embedding models such as MiniLM, MPNet, BGE, E5, GTE, and
+Nomic. The WordPiece vocabulary (`bert-base-uncased`) is embedded in the assembly, so token counts are
+correct offline with no external file to deploy.
 
 For anything else, `MlTokenizerAdapter` wraps any `Microsoft.ML.Tokenizers` tokenizer, so you can plug in
 a Hugging Face JSON tokenizer or a SentencePiece model (Llama, Gemma, T5) and get exact counts for that
@@ -22,6 +22,55 @@ IChunker chunker = new Chunker(new MlTokenizerAdapter(hf));
 
 Gemini is approximated today with cl100k at a 2048 budget. Native SentencePiece is reachable now through
 `MlTokenizerAdapter` when you supply the model.
+
+## BERT WordPiece
+
+`BertWordPieceTokenizerAdapter` is a port of the Hugging Face `BertTokenizer`: basic tokenization followed
+by greedy longest match first WordPiece. That is also what embedding runtimes such as Ollama (llama.cpp)
+and sentence-transformers apply, so the local count is the count the runtime enforces. Normalization runs
+one code point at a time and records where every normalized character came from, so token offsets always
+index the original text, however much the normalizer adds or removes.
+
+The rules, with the defaults for an uncased vocabulary:
+
+- All whitespace separates words: space, `\n`, `\r`, `\t`, `\v`, `\f`, NBSP, and the Unicode line and
+  paragraph separators. A line break never fuses the words around it.
+- Control characters, zero width and other format characters (soft hyphen, ZWJ, BOM), and U+FFFD are
+  removed.
+- Text is lower cased, decomposed, and stripped of nonspacing marks, so `café` and `Türkçe` match the
+  unaccented vocabulary instead of becoming `[UNK]`.
+- ASCII punctuation and symbols (`$ + = < > | ~ ^` and the rest) and Unicode punctuation become their own
+  tokens. Each CJK ideograph is its own word.
+- A word that cannot be segmented, such as an emoji or a word containing one, becomes a single `[UNK]`.
+- A long word is always segmented in full. Hugging Face collapses a word over 100 characters to one
+  `[UNK]`, but llama.cpp segments it, so a long URL or encoded blob can cost dozens of tokens there.
+
+Measured against Ollama `all-minilm` over 43 inputs that exercise every rule (accents, all whitespace
+kinds, control characters, emoji and ZWJ sequences, currency and math symbols, CJK, kana, Cyrillic,
+Arabic, Greek, astral characters, long words, markdown, code, and JSON), 42 counts match exactly. The one
+difference is Devanagari, where llama.cpp also strips spacing combining marks and so counts fewer tokens
+than Hugging Face; the adapter follows Hugging Face and counts more. The fixture lives in
+`src/Test.Shared/Fixtures/wordpiece-counts.json` and the test suite requires every local count to be at
+least the runtime count.
+
+`WordPieceOptions` configures the behavior:
+
+| Option | Default | Meaning |
+|---|---|---|
+| `LowerCase` | true | Lower case before lookup. Required for uncased vocabularies. |
+| `StripAccents` | true | Decompose and remove nonspacing marks. |
+| `TokenizeCjkCharacters` | true | Treat each CJK ideograph as its own word. |
+| `MaxInputCharactersPerWord` | 0 | Collapse longer words to one unknown token. 0 disables the limit. |
+| `UnknownToken` | `[UNK]` | The vocabulary entry for an unsegmentable word. |
+
+```csharp
+// The embedded bert-base-uncased vocabulary with custom options.
+ITokenizerAdapter uncased = new BertWordPieceTokenizerAdapter(new WordPieceOptions { MaxInputCharactersPerWord = 100 });
+
+// A cased vocabulary supplied as a vocab.txt stream.
+using FileStream vocab = File.OpenRead("bert-base-cased-vocab.txt");
+ITokenizerAdapter cased = new BertWordPieceTokenizerAdapter(vocab, new WordPieceOptions { LowerCase = false, StripAccents = false });
+```
 
 ## Resolution
 
@@ -50,19 +99,57 @@ at 512. These report `ProfileSource = ProviderDefault` with `UsedFallback = true
 matches `bert`, `minilm`, `mpnet`, `nomic`, `mxbai`, `e5`, `gte`, and `bge`.
 
 BERT family WordPiece models reserve 2 tokens (`TokenizationDefaults.BertReservedInputTokens`) for the
-`[CLS]` and `[SEP]` special tokens the embedding endpoint adds. The embedded offline tokenizer does not
-count these, so the effective budget is the model's sequence length minus 2 (for example `all-minilm`
-resolves to a 256 token model with a 254 token effective budget). cl100k and o200k models reserve nothing.
+`[CLS]` and `[SEP]` special tokens the embedding endpoint adds. The local tokenizer does not count these,
+so the effective budget is the model's sequence length minus 2 (for example `all-minilm` resolves to a
+256 token model with a 254 token effective budget). cl100k and o200k models reserve nothing.
 
 The budget actually enforced while chunking is the smaller of your `MaxTokens` and the model's resolved
-effective budget, so a chunk never exceeds either limit. If you set a `ContextPrefix`, its token cost is measured
-once and subtracted from the working budget so a prefixed chunk still fits.
+effective budget less any safety margin, so a chunk never exceeds either limit. If you set a
+`ContextPrefix`, its token cost is measured once and subtracted from the working budget so a prefixed chunk
+still fits.
 
-## The strict slice guard
+## Local counts are an approximation of the runtime
 
-Every token slice is decoded, re encoded, and shrunk until its actual token count is within the budget.
-This matters most for WordPiece, where decoding and encoding are not symmetric, and it is the reason a
-512 token limit is a hard guarantee rather than an estimate.
+A local tokenizer can only match the runtime's tokenizer as closely as it reproduces it. The WordPiece
+adapter matches Ollama and Hugging Face on the inputs above, but some configurations still diverge:
+
+- A model mapped to `bert-base-uncased` that actually uses a different vocabulary. The multilingual E5
+  models, for example, use an XLM-R SentencePiece tokenizer. Wrap the real tokenizer in
+  `MlTokenizerAdapter` for exact counts.
+- Runtimes that normalize differently from Hugging Face, such as the Devanagari case above, or that add
+  instruction prefixes (`search_document: `) the chunker does not see.
+- cl100k used as an approximation for a model with its own tokenizer, such as Gemini.
+
+For those cases, hold back a margin and handle an overflow response from the runtime:
+
+```csharp
+ChunkingOptions options = new ChunkingOptions
+{
+    ModelId = "all-minilm",
+    SafetyMarginPercentage = 0.04, // 4 percent of the 254 token budget, rounded up: 11 tokens
+    SafetyMarginTokens = 0         // an absolute margin, added to the percentage
+};
+```
+
+The margin comes off the resolved model budget, not off `MaxTokens`, so a `MaxTokens` already below the
+adjusted model budget is unaffected. `ChunkToResultAsync` reports the enforced budget in
+`Diagnostic.EffectiveTokenBudget`. `ITokenizerCalibrationProbe` measures the budget as a single number, so
+it cannot detect per text divergence; a margin covers that.
+
+## How chunks are cut
+
+The chunker does not slice by token index. Every text strategy works on spans of the original text: the
+token window splits the text into whitespace delimited words (and each CJK ideograph), counts each word,
+packs whole words up to the budget, and then verifies the actual count of the candidate span, galloping
+and binary searching until the largest span that fits is found. A chunk is therefore always an exact
+substring of the source with known offsets, and a limit of 512 tokens is a hard guarantee rather than an
+estimate. A word that alone exceeds the budget is split at grapheme cluster boundaries, never inside a
+surrogate pair, an emoji sequence, or a combining mark sequence. A single code point that exceeds the
+budget by itself (possible only with a budget of one or two tokens) is kept whole rather than corrupted.
+
+`ITokenizerAdapter.SliceByTokenRange` is still part of the adapter contract for callers that need it, but
+the chunker does not use it. The shipped adapters return the exact original text covered by the token
+range.
 
 ## Live calibration
 

@@ -102,6 +102,60 @@ namespace Test.Shared.Suites
                             return Task.CompletedTask;
                         }),
 
+                    new TestCaseDescriptor("Tokenizer", "BytePairSlicesAreSubstrings", "Byte pair slices over emoji text are substrings with no U+FFFD or lone surrogate",
+                        executeAsync: ct =>
+                        {
+                            string text = "Launch \U0001F680 now! \U0001F468\u200D\U0001F469\u200D\U0001F467 caf\u00E9 \u65E5\u672C\u8A9E \U0001F1FA\U0001F1F8 \U0001F600\U0001F600 done.";
+                            foreach (string encoding in new[] { "cl100k_base", "o200k_base" })
+                            {
+                                ITokenizerAdapter tokenizer = new SharpTokenTokenizerAdapter(encoding);
+                                int total = tokenizer.CountTokens(text);
+                                for (int start = 0; start < total; start++)
+                                {
+                                    for (int count = 1; count <= 4; count++)
+                                    {
+                                        string slice = tokenizer.SliceByTokenRange(text, start, count);
+                                        TestSupport.Assert(slice.IndexOf('\uFFFD') < 0, encoding + " slice " + start + "+" + count + " holds U+FFFD");
+                                        TestSupport.Assert(!TestSupport.HasLoneSurrogate(slice), encoding + " slice " + start + "+" + count + " holds a lone surrogate");
+                                        TestSupport.Assert(text.IndexOf(slice, StringComparison.Ordinal) >= 0, encoding + " slice " + start + "+" + count + " is not a substring");
+                                    }
+                                }
+
+                                foreach (int size in new[] { 1, 2, 3, 5 })
+                                {
+                                    System.Text.StringBuilder tiled = new System.Text.StringBuilder();
+                                    for (int start = 0; start < total; start += size)
+                                        tiled.Append(tokenizer.SliceByTokenRange(text, start, size));
+                                    TestSupport.Assert(string.Equals(tiled.ToString(), text, StringComparison.Ordinal), encoding + " consecutive slices of " + size + " did not tile the text exactly");
+                                }
+
+                                TestSupport.ExpectThrows<ArgumentOutOfRangeException>(() => tokenizer.SliceByTokenRange(text, -1, 1), "a negative start should be rejected");
+                                TestSupport.Assert(tokenizer.SliceByTokenRange(text, total, 3).Length == 0, "a slice past the end should be empty");
+                            }
+                            return Task.CompletedTask;
+                        }),
+
+                    new TestCaseDescriptor("Tokenizer", "MlAdapterNormalizingSliceHasNoReplacement", "The ML.Tokenizers adapter never returns U+FFFD from a normalizing tokenizer",
+                        executeAsync: ct =>
+                        {
+                            Assembly assembly = typeof(BertWordPieceTokenizerAdapter).Assembly;
+                            using Stream? stream = assembly.GetManifestResourceStream("TextChunker.Tokenization.Data.bert-base-uncased-vocab.txt");
+                            TestSupport.Assert(stream != null, "embedded vocab stream not found");
+                            Tokenizer bert = BertTokenizer.Create(stream!, new BertOptions { LowerCaseBeforeTokenization = true, ApplyBasicTokenization = true });
+                            ITokenizerAdapter adapter = new MlTokenizerAdapter(bert);
+                            string text = "Caf\u00E9 launch \U0001F680 now, the \u65E5\u672C team said.";
+                            int total = adapter.CountTokens(text);
+                            for (int start = 0; start < total; start++)
+                            {
+                                string slice = adapter.SliceByTokenRange(text, start, 2);
+                                TestSupport.Assert(slice.IndexOf('\uFFFD') < 0, "slice " + start + " holds U+FFFD");
+                                TestSupport.Assert(!TestSupport.HasLoneSurrogate(slice), "slice " + start + " holds a lone surrogate");
+                            }
+
+                            TestSupport.ExpectThrows<ArgumentOutOfRangeException>(() => adapter.SliceByTokenRange(text, -1, 1), "a negative start should be rejected");
+                            return Task.CompletedTask;
+                        }),
+
                     new TestCaseDescriptor("Tokenizer", "MlAdapterWrapsTokenizer", "The ML.Tokenizers passthrough adapter counts and slices",
                         executeAsync: ct =>
                         {

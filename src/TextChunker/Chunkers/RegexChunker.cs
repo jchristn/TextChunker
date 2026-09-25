@@ -2,43 +2,38 @@ namespace TextChunker.Chunkers
 {
     using System;
     using System.Collections.Generic;
-    using System.Linq;
     using System.Text.RegularExpressions;
     using TextChunker.Chunking;
     using TextChunker.Exceptions;
-    using TextChunker.Tokenization;
 
     /// <summary>
     /// Splits text at boundaries defined by a user supplied regular expression, guarded by a timeout
-    /// against catastrophic backtracking. Oversized segments fall back to token span chunking.
+    /// against catastrophic backtracking. Captured groups are kept as segments, as with Regex.Split.
+    /// Oversized segments fall back to the token window.
     /// </summary>
     internal static class RegexChunker
     {
-        internal static List<string> Chunk(string text, ChunkingConfiguration config, ITokenizerAdapter tokenizer, int tokenLimit)
+        internal static List<SourceSpan> Chunk(ChunkingContext context, SourceSpan range, int tokenLimit)
         {
-            if (string.IsNullOrEmpty(text)) return new List<string>();
-            if (string.IsNullOrEmpty(config.RegexPattern))
+            if (range.Length <= 0) return new List<SourceSpan>();
+            if (string.IsNullOrEmpty(context.Config.RegexPattern))
                 throw new InvalidChunkingOptionsException("RegexPattern is required when using the RegexBased strategy.");
 
             Regex regex = new Regex(
-                config.RegexPattern,
+                context.Config.RegexPattern,
                 RegexOptions.Compiled | RegexOptions.Multiline,
-                TimeSpan.FromMilliseconds(config.RegexTimeoutMilliseconds));
+                TimeSpan.FromMilliseconds(context.Config.RegexTimeoutMilliseconds));
 
-            List<string> filtered = regex.Split(text)
-                .Select(s => s.Trim())
-                .Where(s => !string.IsNullOrWhiteSpace(s))
-                .ToList();
+            List<SourceSpan> segments = ChunkingHelpers.SplitByRegex(context.Source, range, regex, true);
+            if (segments.Count == 0) return ChunkingHelpers.ChunkByTokenWindow(context, range, tokenLimit);
 
-            if (filtered.Count == 0) return ChunkingHelpers.ChunkByTokenSpans(text, config, tokenizer, tokenLimit);
-
-            List<string> chunks = new List<string>();
-            foreach (string segment in filtered)
+            List<SourceSpan> chunks = new List<SourceSpan>();
+            foreach (SourceSpan segment in segments)
             {
-                if (tokenizer.CountTokens(segment) <= tokenLimit)
+                if (context.Count(segment) <= tokenLimit)
                     chunks.Add(segment);
                 else
-                    chunks.AddRange(ChunkingHelpers.ChunkByTokenSpans(segment, config, tokenizer, tokenLimit));
+                    chunks.AddRange(ChunkingHelpers.ChunkByTokenWindow(context, segment, tokenLimit));
             }
 
             return chunks;

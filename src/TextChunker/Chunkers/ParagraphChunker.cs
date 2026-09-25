@@ -2,28 +2,26 @@ namespace TextChunker.Chunkers
 {
     using System.Collections.Generic;
     using TextChunker.Chunking;
-    using TextChunker.Tokenization;
 
     /// <summary>
-    /// Splits text at paragraph boundaries (double newline), grouping paragraphs to fill a token budget.
+    /// Splits text at paragraph boundaries (blank lines), grouping paragraphs to fill a token budget.
     /// An oversized paragraph falls back to sentence chunking.
     /// </summary>
     internal static class ParagraphChunker
     {
-        internal static List<string> Chunk(string text, ChunkingConfiguration config, ITokenizerAdapter tokenizer, int tokenLimit)
+        internal static List<SourceSpan> Chunk(ChunkingContext context, SourceSpan range, int tokenLimit)
         {
-            if (string.IsNullOrEmpty(text)) return new List<string>();
+            if (range.Length <= 0) return new List<SourceSpan>();
 
-            List<string> paragraphs = ChunkingHelpers.SplitParagraphs(text);
-            if (paragraphs.Count == 0) return ChunkingHelpers.ChunkByTokenSpans(text, config, tokenizer, tokenLimit);
+            List<SourceSpan> paragraphs = ChunkingHelpers.SplitParagraphs(context, range);
+            if (paragraphs.Count == 0) return ChunkingHelpers.ChunkByTokenWindow(context, range, tokenLimit);
 
-            return ChunkingHelpers.ChunkUnits(
+            return ChunkingHelpers.PackUnits(
+                context,
                 paragraphs,
-                "\n\n",
                 tokenLimit,
-                tokenizer,
-                ChunkingHelpers.GetUnitOverlapCount(config),
-                paragraph => SentenceChunker.Chunk(paragraph, config, tokenizer, tokenLimit));
+                ChunkingHelpers.GetUnitOverlapCount(context.Config),
+                paragraph => SentenceChunker.Chunk(context, paragraph, tokenLimit));
         }
     }
 }

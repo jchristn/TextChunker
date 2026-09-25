@@ -3,7 +3,6 @@ namespace TextChunker.Chunkers
     using System;
     using System.Collections.Generic;
     using TextChunker.Chunking;
-    using TextChunker.Tokenization;
 
     /// <summary>
     /// Recursively splits text on a ladder of separators, descending to a finer separator only when a piece still
@@ -13,33 +12,33 @@ namespace TextChunker.Chunkers
     /// </summary>
     internal static class RecursiveChunker
     {
-        internal static List<string> Chunk(string text, ChunkingConfiguration config, ITokenizerAdapter tokenizer, int tokenLimit)
+        internal static List<SourceSpan> Chunk(ChunkingContext context, SourceSpan range, int tokenLimit)
         {
-            if (string.IsNullOrEmpty(text)) return new List<string>();
+            if (range.Length <= 0) return new List<SourceSpan>();
 
-            List<string> separators = config.Separators != null && config.Separators.Count > 0
-                ? config.Separators
+            List<string> separators = context.Config.Separators != null && context.Config.Separators.Count > 0
+                ? context.Config.Separators
                 : SeparatorSets.DefaultLadder();
 
-            int overlapUnits = ChunkingHelpers.GetUnitOverlapCount(config);
-            return SplitAndMerge(text, separators, 0, config, tokenizer, tokenLimit, overlapUnits);
+            int overlapUnits = ChunkingHelpers.GetUnitOverlapCount(context.Config);
+            return SplitAndMerge(context, range, separators, 0, tokenLimit, overlapUnits);
         }
 
-        private static List<string> SplitAndMerge(
-            string text,
+        private static List<SourceSpan> SplitAndMerge(
+            ChunkingContext context,
+            SourceSpan span,
             List<string> separators,
             int startDepth,
-            ChunkingConfiguration config,
-            ITokenizerAdapter tokenizer,
             int tokenLimit,
             int overlapUnits)
         {
-            List<string> results = new List<string>();
-            if (string.IsNullOrEmpty(text)) return results;
+            List<SourceSpan> results = new List<SourceSpan>();
+            if (span.Length <= 0) return results;
 
-            if (tokenizer.CountTokens(text) <= tokenLimit)
+            string source = context.Source;
+            if (context.Count(span) <= tokenLimit)
             {
-                if (!string.IsNullOrWhiteSpace(text)) results.Add(text);
+                if (!ChunkingHelpers.IsWhiteSpace(source, span)) results.Add(span);
                 return results;
             }
 
@@ -55,7 +54,7 @@ namespace TextChunker.Chunkers
                     break;
                 }
 
-                if (text.IndexOf(candidate, StringComparison.Ordinal) >= 0)
+                if (source.IndexOf(candidate, span.Start, span.Length, StringComparison.Ordinal) >= 0)
                 {
                     separator = candidate;
                     nextDepth = depth + 1;
@@ -65,18 +64,14 @@ namespace TextChunker.Chunkers
 
             if (separator.Length == 0)
             {
-                results.AddRange(ChunkingHelpers.ChunkByTokenSpans(text, config, tokenizer, tokenLimit));
+                results.AddRange(ChunkingHelpers.ChunkByTokenWindow(context, span, tokenLimit));
                 return results;
             }
 
-            string[] parts = text.Split(new[] { separator }, StringSplitOptions.None);
-            List<string> goodSplits = new List<string>();
-
-            foreach (string part in parts)
+            List<SourceSpan> goodSplits = new List<SourceSpan>();
+            foreach (SourceSpan part in SplitOn(source, span, separator))
             {
-                if (part.Length == 0) continue;
-
-                if (tokenizer.CountTokens(part) <= tokenLimit)
+                if (context.Count(part) <= tokenLimit)
                 {
                     goodSplits.Add(part);
                 }
@@ -84,35 +79,65 @@ namespace TextChunker.Chunkers
                 {
                     if (goodSplits.Count > 0)
                     {
-                        results.AddRange(Merge(goodSplits, separator, config, tokenizer, tokenLimit, overlapUnits));
+                        results.AddRange(Merge(context, goodSplits, tokenLimit, overlapUnits));
                         goodSplits.Clear();
                     }
 
-                    results.AddRange(SplitAndMerge(part, separators, nextDepth, config, tokenizer, tokenLimit, overlapUnits));
+                    results.AddRange(SplitAndMerge(context, part, separators, nextDepth, tokenLimit, overlapUnits));
                 }
             }
 
             if (goodSplits.Count > 0)
-                results.AddRange(Merge(goodSplits, separator, config, tokenizer, tokenLimit, overlapUnits));
+                results.AddRange(Merge(context, goodSplits, tokenLimit, overlapUnits));
 
             return results;
         }
 
-        private static List<string> Merge(
-            List<string> units,
-            string separator,
-            ChunkingConfiguration config,
-            ITokenizerAdapter tokenizer,
-            int tokenLimit,
-            int overlapUnits)
+        private static List<SourceSpan> SplitOn(string source, SourceSpan span, string separator)
         {
-            return ChunkingHelpers.ChunkUnits(
+            // Only the whitespace of a separator is discarded. Its visible core stays with the text it belongs to:
+            // a separator that opens a block after a line break ("\n## ", "\nclass ") keeps its core with the part
+            // that follows, and any other separator (". ") keeps its core with the part that precedes it. That way a
+            // chunk boundary never drops a heading marker, a keyword, or sentence punctuation.
+            int leading = 0;
+            while (leading < separator.Length && char.IsWhiteSpace(separator[leading])) leading++;
+            int trailing = 0;
+            while (trailing < separator.Length - leading && char.IsWhiteSpace(separator[separator.Length - 1 - trailing])) trailing++;
+            int coreLength = separator.Length - leading - trailing;
+            bool coreOpensNextPart = coreLength > 0 && leading > 0;
+            bool coreClosesPreviousPart = coreLength > 0 && leading == 0;
+
+            List<SourceSpan> parts = new List<SourceSpan>();
+            int position = span.Start;
+            while (position <= span.End)
+            {
+                int found = position < span.End
+                    ? source.IndexOf(separator, position, span.End - position, StringComparison.Ordinal)
+                    : -1;
+                int partEnd = found < 0 ? span.End : (coreClosesPreviousPart ? found + coreLength : found);
+                if (partEnd > position) parts.Add(new SourceSpan(position, partEnd));
+                if (found < 0) break;
+                position = coreOpensNextPart ? found + leading : found + separator.Length;
+            }
+
+            return parts;
+        }
+
+        private static List<SourceSpan> Merge(ChunkingContext context, List<SourceSpan> parts, int tokenLimit, int overlapUnits)
+        {
+            List<SourceSpan> units = new List<SourceSpan>(parts.Count);
+            foreach (SourceSpan part in parts)
+            {
+                SourceSpan trimmed = ChunkingHelpers.Trim(context.Source, part);
+                if (trimmed.Length > 0) units.Add(trimmed);
+            }
+
+            return ChunkingHelpers.PackUnits(
+                context,
                 units,
-                separator,
                 tokenLimit,
-                tokenizer,
                 overlapUnits,
-                unit => ChunkingHelpers.ChunkByTokenSpans(unit, config, tokenizer, tokenLimit));
+                unit => ChunkingHelpers.ChunkByTokenWindow(context, unit, tokenLimit));
         }
     }
 }

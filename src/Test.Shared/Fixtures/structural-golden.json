@@ -1,10 +1,10 @@
 {
   "recursive-prose": [
-    "The quick brown fox jumps over the lazy dog. The dog was not amused by the fox",
+    "The quick brown fox jumps over the lazy dog. The dog was not amused by the fox.",
     "It had been sleeping soundly for hours before the interruption occurred.",
-    "Meanwhile, a second paragraph describes an entirely different scene. Rain fell on the quiet town",
+    "Meanwhile, a second paragraph describes an entirely different scene. Rain fell on the quiet town.",
     "Streets emptied as people retreated indoors to wait out the storm.",
-    "A final paragraph closes the sample. Chunking must preserve every meaningful word",
+    "A final paragraph closes the sample. Chunking must preserve every meaningful word.",
     "Determinism matters more than anything else in this pipeline."
   ],
   "list-entry": [

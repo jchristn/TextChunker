@@ -26,12 +26,23 @@ namespace TextChunker.Chunking
             if (options.HierarchyAware && IsTextType(request.Type))
                 return ProduceHierarchy(request.Text ?? string.Empty, config, tokenizer, workingBudget, options);
 
-            bool offsetEligible = IsTextType(request.Type);
-            List<string> raw = GetRawChunks(request, config, tokenizer, workingBudget);
+            List<RawPiece> pieces = new List<RawPiece>();
+            if (IsTextType(request.Type))
+            {
+                // Text strategies return spans of the request text, so every piece carries exact source offsets.
+                string text = request.Text ?? string.Empty;
+                ChunkingContext context = new ChunkingContext(text, config, tokenizer);
+                foreach (SourceSpan span in DispatchText(context, new SourceSpan(0, text.Length), workingBudget))
+                    pieces.Add(new RawPiece(context.Text(span), null, span.Start, span.End));
+                return pieces;
+            }
 
-            List<RawPiece> pieces = new List<RawPiece>(raw.Count);
+            List<string> raw = request.Type == ContentTypeEnum.List
+                ? ChunkList(request, config, tokenizer, workingBudget)
+                : ChunkTableRequest(request, config, tokenizer, workingBudget);
+
             foreach (string text in raw)
-                pieces.Add(new RawPiece(text, null, offsetEligible));
+                pieces.Add(new RawPiece(text, null));
 
             return pieces;
         }
@@ -78,74 +89,65 @@ namespace TextChunker.Chunking
             ChunkingOptions options)
         {
             HierarchyNode root = HierarchyBuilder.Build(text);
+            ChunkingContext context = new ChunkingContext(text, config, tokenizer);
             List<RawPiece> pieces = new List<RawPiece>();
 
             foreach (HierarchyNode node in HierarchyBuilder.Flatten(root))
             {
-                string content = node.GetContent();
-                if (string.IsNullOrWhiteSpace(content)) continue;
+                SourceSpan content = node.GetContentSpan(text);
+                if (content.Length == 0) continue;
 
                 string breadcrumb = node.BuildBreadcrumb(options.HeaderContextSeparator);
-                int breadcrumbTokens = options.ContextualizeHeaders && !string.IsNullOrEmpty(breadcrumb)
-                    ? tokenizer.CountTokens(breadcrumb)
+                string? header = string.IsNullOrEmpty(breadcrumb) ? null : breadcrumb;
+                int breadcrumbTokens = options.ContextualizeHeaders && header != null
+                    ? tokenizer.CountTokens(header)
                     : 0;
                 int sectionBudget = Math.Max(1, workingBudget - breadcrumbTokens);
 
-                List<string> raw = DispatchText(content, config, tokenizer, sectionBudget);
-                foreach (string chunk in raw)
-                    pieces.Add(new RawPiece(chunk, string.IsNullOrEmpty(breadcrumb) ? null : breadcrumb, false));
+                foreach (SourceSpan span in DispatchText(context, content, sectionBudget))
+                    pieces.Add(new RawPiece(context.Text(span), header, span.Start, span.End));
             }
 
             return pieces;
-        }
-
-        private static List<string> GetRawChunks(
-            ContentRequest request,
-            ChunkingConfiguration config,
-            ITokenizerAdapter tokenizer,
-            int tokenBudget)
-        {
-            switch (request.Type)
-            {
-                case ContentTypeEnum.List:
-                    return ChunkList(request, config, tokenizer, tokenBudget);
-                case ContentTypeEnum.Table:
-                    return ChunkTableRequest(request, config, tokenizer, tokenBudget);
-                default:
-                    return DispatchText(request.Text ?? string.Empty, config, tokenizer, tokenBudget);
-            }
         }
 
         private static List<string> DispatchText(string text, ChunkingConfiguration config, ITokenizerAdapter tokenizer, int tokenBudget)
         {
             if (string.IsNullOrEmpty(text)) return new List<string>();
 
-            switch (config.Strategy)
+            ChunkingContext context = new ChunkingContext(text, config, tokenizer);
+            return DispatchText(context, new SourceSpan(0, text.Length), tokenBudget).Select(context.Text).ToList();
+        }
+
+        private static List<SourceSpan> DispatchText(ChunkingContext context, SourceSpan range, int tokenBudget)
+        {
+            if (range.Length <= 0) return new List<SourceSpan>();
+
+            switch (context.Config.Strategy)
             {
                 case ChunkStrategyEnum.FixedTokenCount:
-                    return FixedTokenChunker.Chunk(text, config, tokenizer, tokenBudget);
+                    return FixedTokenChunker.Chunk(context, range, tokenBudget);
                 case ChunkStrategyEnum.SentenceBased:
-                    return SentenceChunker.Chunk(text, config, tokenizer, tokenBudget);
+                    return SentenceChunker.Chunk(context, range, tokenBudget);
                 case ChunkStrategyEnum.ParagraphBased:
-                    return ParagraphChunker.Chunk(text, config, tokenizer, tokenBudget);
+                    return ParagraphChunker.Chunk(context, range, tokenBudget);
                 case ChunkStrategyEnum.RegexBased:
-                    return RegexChunker.Chunk(text, config, tokenizer, tokenBudget);
+                    return RegexChunker.Chunk(context, range, tokenBudget);
                 case ChunkStrategyEnum.Recursive:
-                    return RecursiveChunker.Chunk(text, config, tokenizer, tokenBudget);
+                    return RecursiveChunker.Chunk(context, range, tokenBudget);
                 case ChunkStrategyEnum.WholeList:
-                    if (tokenizer.CountTokens(text) <= tokenBudget)
-                        return new List<string> { text };
-                    return ChunkingHelpers.ChunkByTokenSpans(text, config, tokenizer, tokenBudget);
+                    if (context.Count(range) <= tokenBudget)
+                        return new List<SourceSpan> { range };
+                    return ChunkingHelpers.ChunkByTokenWindow(context, range, tokenBudget);
                 case ChunkStrategyEnum.ListEntry:
-                    return ChunkingHelpers.ChunkUnits(
-                        text.Split('\n').Where(line => !string.IsNullOrWhiteSpace(line)).ToList(),
-                        "\n",
+                    return ChunkingHelpers.PackUnits(
+                        context,
+                        ChunkingHelpers.SplitLines(context, range),
                         tokenBudget,
-                        tokenizer,
                         0,
-                        line => ChunkingHelpers.ChunkByTokenSpans(line, config, tokenizer, tokenBudget));
+                        line => ChunkingHelpers.ChunkByTokenWindow(context, line, tokenBudget));
                 default:
-                    return FixedTokenChunker.Chunk(text, config, tokenizer, tokenBudget);
+                    return FixedTokenChunker.Chunk(context, range, tokenBudget);
             }
         }
 

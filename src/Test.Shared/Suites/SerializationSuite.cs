@@ -77,7 +77,9 @@ namespace Test.Shared.Suites
                                 OverlapCount = 32,
                                 Format = ContentFormatEnum.Markdown,
                                 HierarchyAware = true,
-                                ModelId = "all-minilm"
+                                ModelId = "all-minilm",
+                                SafetyMarginTokens = 3,
+                                SafetyMarginPercentage = 0.04
                             };
                             string json = ChunkerJson.Serialize(options);
                             ChunkingOptions? restored = ChunkerJson.Deserialize<ChunkingOptions>(json);
@@ -86,6 +88,8 @@ namespace Test.Shared.Suites
                             TestSupport.Assert(restored.MaxTokens == 384, "max tokens did not round trip");
                             TestSupport.Assert(restored.Format == ContentFormatEnum.Markdown, "format did not round trip");
                             TestSupport.Assert(restored.ModelId == "all-minilm", "model id did not round trip");
+                            TestSupport.Assert(restored.SafetyMarginTokens == 3, "safety margin tokens did not round trip");
+                            TestSupport.Assert(restored.SafetyMarginPercentage == 0.04, "safety margin percentage did not round trip");
                             return Task.CompletedTask;
                         }),
 

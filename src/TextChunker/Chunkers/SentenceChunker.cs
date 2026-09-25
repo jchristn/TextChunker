@@ -3,29 +3,28 @@ namespace TextChunker.Chunkers
     using System.Collections.Generic;
     using System.Text.RegularExpressions;
     using TextChunker.Chunking;
-    using TextChunker.Tokenization;
 
     /// <summary>
-    /// Splits text at sentence boundaries, grouping sentences to fill a token budget.
+    /// Splits text at sentence boundaries, grouping sentences to fill a token budget. An oversized sentence falls
+    /// back to the token window.
     /// </summary>
     internal static class SentenceChunker
     {
         internal static readonly Regex SentencePattern = new Regex(@"(?<=[.!?])\s+", RegexOptions.Compiled);
 
-        internal static List<string> Chunk(string text, ChunkingConfiguration config, ITokenizerAdapter tokenizer, int tokenLimit)
+        internal static List<SourceSpan> Chunk(ChunkingContext context, SourceSpan range, int tokenLimit)
         {
-            if (string.IsNullOrEmpty(text)) return new List<string>();
+            if (range.Length <= 0) return new List<SourceSpan>();
 
-            List<string> sentences = ChunkingHelpers.SplitSentences(text);
-            if (sentences.Count == 0) return ChunkingHelpers.ChunkByTokenSpans(text, config, tokenizer, tokenLimit);
+            List<SourceSpan> sentences = ChunkingHelpers.SplitSentences(context, range);
+            if (sentences.Count == 0) return ChunkingHelpers.ChunkByTokenWindow(context, range, tokenLimit);
 
-            return ChunkingHelpers.ChunkUnits(
+            return ChunkingHelpers.PackUnits(
+                context,
                 sentences,
-                " ",
                 tokenLimit,
-                tokenizer,
-                ChunkingHelpers.GetUnitOverlapCount(config),
-                sentence => ChunkingHelpers.ChunkByTokenSpans(sentence, config, tokenizer, tokenLimit));
+                ChunkingHelpers.GetUnitOverlapCount(context.Config),
+                sentence => ChunkingHelpers.ChunkByTokenWindow(context, sentence, tokenLimit));
         }
     }
 }

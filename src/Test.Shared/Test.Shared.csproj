@@ -18,6 +18,7 @@
   <ItemGroup>
     <EmbeddedResource Include="Fixtures\chunking-parity.json" />
     <EmbeddedResource Include="Fixtures\structural-golden.json" />
+    <EmbeddedResource Include="Fixtures\wordpiece-counts.json" />
   </ItemGroup>
 
 </Project>

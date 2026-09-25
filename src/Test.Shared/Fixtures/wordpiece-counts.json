@@ -1,0 +1,260 @@
+[
+  {
+    "category": "ascii",
+    "text": "alpha beta gamma delta epsilon",
+    "count": 5,
+    "runtimeCount": 5
+  },
+  {
+    "category": "ascii",
+    "text": "The quick brown fox jumps over the lazy dog.",
+    "count": 10,
+    "runtimeCount": 10
+  },
+  {
+    "category": "ascii",
+    "text": "Tokenization of embeddings and chunking pipelines is unaffable.",
+    "count": 17,
+    "runtimeCount": 17
+  },
+  {
+    "category": "ascii-punctuation",
+    "text": "don\u0027t won\u0027t y\u0027all can\u0027t",
+    "count": 12,
+    "runtimeCount": 12
+  },
+  {
+    "category": "ascii-punctuation",
+    "text": "price: $100.00 (approx.) [see note] {x} \u003Ctag\u003E",
+    "count": 20,
+    "runtimeCount": 20
+  },
+  {
+    "category": "ascii-symbols",
+    "text": "$5 \u002B 3 = 8 \u003C 9 \u003E 1 | ~ ^ \u0060",
+    "count": 14,
+    "runtimeCount": 14
+  },
+  {
+    "category": "ascii-symbols",
+    "text": "C\u002B\u002B a\u002Bb=c x*y a/b a\\b a_b a-b a@b a#b a%b a\u0026b",
+    "count": 35,
+    "runtimeCount": 35
+  },
+  {
+    "category": "url",
+    "text": "https://example.com/path/to/page?q=1\u0026r=two#fragment",
+    "count": 23,
+    "runtimeCount": 23
+  },
+  {
+    "category": "numbers",
+    "text": "3.14159 1,000,000 2026-09-24 10:30am 42nd",
+    "count": 20,
+    "runtimeCount": 20
+  },
+  {
+    "category": "whitespace",
+    "text": "alpha\n\nbeta gamma\tdelta\r\nepsilon",
+    "count": 5,
+    "runtimeCount": 5
+  },
+  {
+    "category": "whitespace",
+    "text": "tab\u000Bvt\fff",
+    "count": 3,
+    "runtimeCount": 3
+  },
+  {
+    "category": "whitespace",
+    "text": "\u00A0nbsp\u00A0here and\u2028line\u2029para",
+    "count": 7,
+    "runtimeCount": 7
+  },
+  {
+    "category": "whitespace",
+    "text": "   leading and trailing   ",
+    "count": 3,
+    "runtimeCount": 3
+  },
+  {
+    "category": "control",
+    "text": "a\u0000b\u0001c\u001Fd",
+    "count": 2,
+    "runtimeCount": 2
+  },
+  {
+    "category": "control",
+    "text": "hello\u200Bworld \uFEFFbom a\u00ADb",
+    "count": 5,
+    "runtimeCount": 5
+  },
+  {
+    "category": "accents",
+    "text": "caf\u00E9 na\u00EFve r\u00E9sum\u00E9 Zo\u00EB co\u00F6perate",
+    "count": 5,
+    "runtimeCount": 5
+  },
+  {
+    "category": "accents",
+    "text": "T\u00FCrk\u00E7e \u00E7ok g\u00FCzel bir dil, \u015Fehir \u0131\u015F\u0131klar\u0131 g\u00F6r\u00FCn\u00FCyor.",
+    "count": 23,
+    "runtimeCount": 23
+  },
+  {
+    "category": "accents",
+    "text": "cafe\u0301 decomposed e\u0301te\u0301",
+    "count": 6,
+    "runtimeCount": 6
+  },
+  {
+    "category": "accents",
+    "text": "Stra\u00DFe STRASSE \u00C5ngstr\u00F6m \u212B",
+    "count": 8,
+    "runtimeCount": 8
+  },
+  {
+    "category": "greek",
+    "text": "\u03A3\u03AF\u03C3\u03C5\u03C6\u03BF\u03C2 \u03B1-helix \u03B2-sheet",
+    "count": 12,
+    "runtimeCount": 12
+  },
+  {
+    "category": "cyrillic",
+    "text": "\u041F\u0440\u0438\u0432\u0435\u0442 \u043C\u0438\u0440",
+    "count": 9,
+    "runtimeCount": 9
+  },
+  {
+    "category": "arabic",
+    "text": "\u0645\u0631\u062D\u0628\u0627 \u0628\u0627\u0644\u0639\u0627\u0644\u0645",
+    "count": 12,
+    "runtimeCount": 12
+  },
+  {
+    "category": "cjk",
+    "text": "\u65E5\u672C\u8A9E text \u4E2D\u6587\u5B57\u7B26",
+    "count": 8,
+    "runtimeCount": 8
+  },
+  {
+    "category": "cjk",
+    "text": "\u8FD9\u662F\u4E00\u4E2A\u7528\u4E8E\u6D4B\u8BD5\u5206\u5757\u7684\u4E2D\u6587\u53E5\u5B50\u3002",
+    "count": 16,
+    "runtimeCount": 16
+  },
+  {
+    "category": "kana",
+    "text": "\u3072\u3089\u304C\u306A \u30AB\u30BF\u30AB\u30CA",
+    "count": 8,
+    "runtimeCount": 8
+  },
+  {
+    "category": "emoji",
+    "text": "great job \uD83D\uDE00 \uD83D\uDE80 thanks",
+    "count": 5,
+    "runtimeCount": 5
+  },
+  {
+    "category": "emoji",
+    "text": "x\uD83D\uDE00y \uD83D\uDE00\uD83D\uDE00\uD83D\uDE00",
+    "count": 2,
+    "runtimeCount": 2
+  },
+  {
+    "category": "emoji",
+    "text": "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67 family \uD83D\uDC4D\uD83C\uDFFD \uD83C\uDDFA\uD83C\uDDF8",
+    "count": 4,
+    "runtimeCount": 4
+  },
+  {
+    "category": "emoji",
+    "text": "Point 1 is done! \uD83D\uDC26 Point 2 is done! \uD83D\uDC26",
+    "count": 12,
+    "runtimeCount": 12
+  },
+  {
+    "category": "symbols",
+    "text": "x \u00A9 \u00AE \u2122 \u00B0 \u20AC \u00A3 \u00A5 \u00A7 \u00B6 \u2022 \u2026 \u2014 \u2013",
+    "count": 14,
+    "runtimeCount": 14
+  },
+  {
+    "category": "symbols",
+    "text": "\u201Cquoted\u201D \u2018single\u2019 \u00ABguillemets\u00BB",
+    "count": 12,
+    "runtimeCount": 12
+  },
+  {
+    "category": "symbols",
+    "text": "\u2713 \u2717 \u2192 \u2190 \u2211 \u221E \u2248 \u2260",
+    "count": 8,
+    "runtimeCount": 8
+  },
+  {
+    "category": "symbols",
+    "text": "\u03B1-helix 10\u207B\u00B3 M \u00B1 5% e=mc\u00B2",
+    "count": 14,
+    "runtimeCount": 14
+  },
+  {
+    "category": "symbols",
+    "text": "\u00BD \u00B2 \u00B3 \u2074 \u2167 \u2460 \u24D0",
+    "count": 7,
+    "runtimeCount": 7
+  },
+  {
+    "category": "astral",
+    "text": "\uD835\uDC01\uD835\uDC28\uD835\uDC25\uD835\uDC1D math \uD840\uDC00\uD840\uDC01",
+    "count": 4,
+    "runtimeCount": 4
+  },
+  {
+    "category": "compatibility",
+    "text": "\uFB01ne \uFB00 \u2126",
+    "count": 4,
+    "runtimeCount": 4
+  },
+  {
+    "category": "long-word",
+    "text": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa end",
+    "count": 76,
+    "runtimeCount": 76
+  },
+  {
+    "category": "long-word",
+    "text": "Pneumonoultramicroscopicsilicovolcanoconiosis supercalifragilisticexpialidocious",
+    "count": 28,
+    "runtimeCount": 28
+  },
+  {
+    "category": "markdown",
+    "text": "# Heading\n\n- item one\n- item two\n\n\u0060\u0060\u0060csharp\nvar x = 1;\n\u0060\u0060\u0060",
+    "count": 22,
+    "runtimeCount": 22
+  },
+  {
+    "category": "code",
+    "text": "public static int Main(string[] args) { return args.Length \u003E 0 ? 1 : 0; }",
+    "count": 25,
+    "runtimeCount": 25
+  },
+  {
+    "category": "json",
+    "text": "{\u0022key\u0022: [1, 2, 3], \u0022nested\u0022: {\u0022a\u0022: null, \u0022b\u0022: true}}",
+    "count": 32,
+    "runtimeCount": 32
+  },
+  {
+    "category": "chat",
+    "text": "\n\nNow, let\u0027s talk about Twitter engagement! \uD83D\uDC26 See you soon.",
+    "count": 15,
+    "runtimeCount": 15
+  },
+  {
+    "category": "devanagari",
+    "text": "\u0928\u092E\u0938\u094D\u0924\u0947 \u0926\u0941\u0928\u093F\u092F\u093E",
+    "count": 9,
+    "runtimeCount": 7
+  }
+]

@@ -37,21 +37,29 @@ A single instance holds no per call mutable state and is safe to share across th
 
 ## Chunk
 
-The produced chunk. See the README for the full field list. Notable points: `Text` is never null,
-`StartOffset` and `EndOffset` are `-1` when the chunk is serialized list or table output rather than a
-literal substring, and `HeaderContext` is null unless hierarchy aware chunking was requested.
+The produced chunk. See the README for the full field list. Notable points: `Text` is never null, and
+`HeaderContext` is null unless hierarchy aware chunking was requested. For every text strategy
+`StartOffset` and `EndOffset` come from the exact source span the chunk was cut from, so
+`source.Substring(StartOffset, EndOffset - StartOffset)` always equals `Text`. They are `-1` only when the
+text is not a source substring: serialized list or table output, a `ContextPrefix`, a contextualized header,
+or small chunks merged across non whitespace.
 
 ## ChunkingOptions
 
 The parameters that control an operation. Properties with a range or nullability constraint validate on
 assignment and throw `InvalidChunkingOptionsException`. See [STRATEGIES.md](STRATEGIES.md) for how the
-overlap options interact and [TOKENIZERS.md](TOKENIZERS.md) for the tokenizer options. Presets:
+overlap options interact and [TOKENIZERS.md](TOKENIZERS.md) for the tokenizer options.
+`SafetyMarginTokens` and `SafetyMarginPercentage` hold back part of the resolved model budget for runtimes
+whose tokenizer can count more than the local one. Presets:
 `ChunkingOptions.ForRag()`, `ForSummarization()`, and `ForLargeContext()`.
 
 ## Tokenization
 
-`ITokenizerAdapter` exposes `CountTokens`, `Encode`, `Decode`, and `SliceByTokenRange`. Two adapters
-ship: `SharpTokenTokenizerAdapter` and `BertWordPieceTokenizerAdapter`. `TokenizerAdapterFactory.Create`
+`ITokenizerAdapter` exposes `CountTokens`, `Encode`, `Decode`, and `SliceByTokenRange`. Three adapters
+ship: `SharpTokenTokenizerAdapter` (cl100k, o200k), `BertWordPieceTokenizerAdapter` (configured with
+`WordPieceOptions`, over the embedded bert-base-uncased vocabulary or a caller supplied `vocab.txt`
+stream), and `MlTokenizerAdapter` (any `Microsoft.ML.Tokenizers` tokenizer). The chunker only calls
+`CountTokens`, so a custom adapter needs an accurate count above all. `TokenizerAdapterFactory.Create`
 builds one from a `ResolvedTokenizationProfile`. `TokenizationProfileResolver` resolves a profile, and
 `ITokenizerCalibrationProbe` is the optional live calibration hook.
 

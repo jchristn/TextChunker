@@ -3,8 +3,9 @@ namespace TextChunker.Tokenization
     using System.Collections.Generic;
 
     /// <summary>
-    /// Provider agnostic tokenizer operations used by the chunking strategies.
-    /// Implementations must be safe for concurrent read use.
+    /// Provider agnostic tokenizer operations. The chunking strategies call only <see cref="CountTokens"/>, so an
+    /// accurate count is what matters most for a custom implementation. Implementations must be safe for
+    /// concurrent read use.
     /// </summary>
     public interface ITokenizerAdapter
     {
@@ -31,12 +32,14 @@ namespace TextChunker.Tokenization
         string Decode(IEnumerable<int> tokenIds);
 
         /// <summary>
-        /// Slice a text span by tokenizer native token range and return the decoded text for that range.
+        /// Return the text covered by a range of tokenizer native tokens. The shipped adapters return the exact
+        /// substring of the input that the tokens cover, never splitting a surrogate pair; an implementation that
+        /// cannot map tokens back to the input may return decoded text instead.
         /// </summary>
         /// <param name="text">Source text.</param>
         /// <param name="startTokenIndex">Zero based token index to start from. Must be at least 0.</param>
         /// <param name="tokenCount">Number of tokens to include. Values of 0 or less return an empty string.</param>
-        /// <returns>Decoded text for the requested token range.</returns>
+        /// <returns>Text for the requested token range.</returns>
         /// <exception cref="System.ArgumentOutOfRangeException">Thrown when startTokenIndex is negative.</exception>
         string SliceByTokenRange(string text, int startTokenIndex, int tokenCount);
     }

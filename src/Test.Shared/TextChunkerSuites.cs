@@ -31,6 +31,8 @@ namespace Test.Shared
                     MetadataSuite.Build(),
                     SmallChunkSuite.Build(),
                     UnicodeSuite.Build(),
+                    WordPieceSuite.Build(),
+                    SpanIntegritySuite.Build(),
                     PresetSuite.Build(),
                     DiagnosticsSuite.Build(),
                     DependencyInjectionSuite.Build(),

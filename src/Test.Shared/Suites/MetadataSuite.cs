@@ -145,13 +145,18 @@ namespace Test.Shared.Suites
                     new TestCaseDescriptor("Metadata", "TrimWhitespaceDisabled", "Whitespace is preserved when trimming is disabled",
                         executeAsync: ct =>
                         {
-                            IReadOnlyList<Chunk> trimmed = TestSupport.Chunk(TestSupport.WordCorpus(120), new ChunkingOptions { MaxTokens = 24, TrimWhitespace = true });
-                            IReadOnlyList<Chunk> raw = TestSupport.Chunk(TestSupport.WordCorpus(120), new ChunkingOptions { MaxTokens = 24, TrimWhitespace = false });
-                            TestSupport.Assert(trimmed.Count == raw.Count, "chunk count should not depend on trimming");
-                            bool anyLeadingSpace = false;
-                            foreach (Chunk c in raw)
-                                if (c.Text.Length > 0 && char.IsWhiteSpace(c.Text[0])) anyLeadingSpace = true;
-                            TestSupport.Assert(anyLeadingSpace, "expected at least one untrimmed chunk to retain leading whitespace");
+                            // A recursive chunk that fits whole is the source span itself, surrounding whitespace included,
+                            // so trimming is the only thing that removes it.
+                            string source = "  \n  A padded passage that fits in one chunk.  \n  ";
+                            ChunkingOptions options = new ChunkingOptions { Strategy = ChunkStrategyEnum.Recursive, MaxTokens = 64 };
+                            IReadOnlyList<Chunk> trimmed = TestSupport.Chunk(source, options);
+                            options.TrimWhitespace = false;
+                            IReadOnlyList<Chunk> raw = TestSupport.Chunk(source, options);
+                            TestSupport.Assert(trimmed.Count == 1 && raw.Count == 1, "expected a single chunk either way");
+                            TestSupport.Assert(string.Equals(raw[0].Text, source, StringComparison.Ordinal), "untrimmed chunk should keep the surrounding whitespace");
+                            TestSupport.Assert(string.Equals(trimmed[0].Text, source.Trim(), StringComparison.Ordinal), "trimmed chunk should drop the surrounding whitespace");
+                            TestSupport.Assert(raw[0].StartOffset == 0 && raw[0].EndOffset == source.Length, "untrimmed offsets should cover the whole source");
+                            TestSupport.Assert(trimmed[0].StartOffset == source.IndexOf('A') && trimmed[0].EndOffset == source.IndexOf('.') + 1, "trimmed offsets should move with the trim");
                             return Task.CompletedTask;
                         }),
 

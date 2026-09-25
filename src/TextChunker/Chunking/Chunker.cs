@@ -281,20 +281,20 @@ namespace TextChunker.Chunking
             int prefixTokens = string.IsNullOrEmpty(options.ContextPrefix) ? 0 : tokenizer.CountTokens(options.ContextPrefix!);
             int workingBudget = Math.Max(1, budget - prefixTokens);
 
+            string? pieceSource = ChunkDispatcher.IsTextType(request.Type) ? request.Text ?? string.Empty : null;
             List<RawPiece> pieces = await Task
-                .Run(() => Transform(ChunkDispatcher.Produce(request, options, tokenizer, workingBudget), options, tokenizer, workingBudget), token)
+                .Run(() => Transform(ChunkDispatcher.Produce(request, options, tokenizer, workingBudget), options, tokenizer, workingBudget, pieceSource), token)
                 .ConfigureAwait(false);
 
             Guid? parent = ResolveParent(request, options);
             bool offsetsAllowed = options.ComputeOffsets && offsetSource != null && string.IsNullOrEmpty(options.ContextPrefix);
-            int searchFrom = 0;
             int position = 0;
 
             foreach (RawPiece piece in pieces)
             {
                 token.ThrowIfCancellationRequested();
 
-                Chunk chunk = Enrich(piece, position, parent, options, profile, tokenizer, offsetSource, offsetsAllowed, ref searchFrom);
+                Chunk chunk = Enrich(piece, position, parent, options, profile, tokenizer, offsetsAllowed);
                 CopyRequestMetadata(chunk, request);
                 position++;
 
@@ -305,7 +305,7 @@ namespace TextChunker.Chunking
             }
         }
 
-        private List<RawPiece> Transform(List<RawPiece> pieces, ChunkingOptions options, ITokenizerAdapter tokenizer, int workingBudget)
+        private List<RawPiece> Transform(List<RawPiece> pieces, ChunkingOptions options, ITokenizerAdapter tokenizer, int workingBudget, string? source)
         {
             List<RawPiece> working = pieces;
 
@@ -324,21 +324,59 @@ namespace TextChunker.Chunking
                     if (candidate.Length != piece.Text.Length
                         && tokenizer.CountTokens(candidate) > tokenizer.CountTokens(piece.Text))
                     {
-                        candidate = piece.Text;
+                        trimmed.Add(piece);
+                        continue;
                     }
 
-                    trimmed.Add(new RawPiece(candidate, piece.HeaderContext, piece.OffsetEligible));
+                    if (!piece.HasOffsets)
+                    {
+                        trimmed.Add(new RawPiece(candidate, piece.HeaderContext));
+                        continue;
+                    }
+
+                    int leading = 0;
+                    while (leading < piece.Text.Length && char.IsWhiteSpace(piece.Text[leading])) leading++;
+                    int start = piece.StartOffset + leading;
+                    trimmed.Add(new RawPiece(candidate, piece.HeaderContext, start, start + candidate.Length));
                 }
                 working = trimmed;
             }
 
+            working = SuppressContainedPieces(working);
+
             if (options.MinChunkTokens > 0 && options.SmallChunkMode != SmallChunkModeEnum.Keep && working.Count > 0)
-                working = ApplySmallChunkMode(working, options, tokenizer, workingBudget);
+                working = ApplySmallChunkMode(working, options, tokenizer, workingBudget, source);
 
             return working;
         }
 
-        private List<RawPiece> ApplySmallChunkMode(List<RawPiece> pieces, ChunkingOptions options, ITokenizerAdapter tokenizer, int workingBudget)
+        private static List<RawPiece> SuppressContainedPieces(List<RawPiece> pieces)
+        {
+            // Backstop: a piece whose source span lies wholly inside the previous piece's span repeats content the
+            // caller already has. The span based strategies never produce one, so any suppression here is counted
+            // in the chunks_suppressed metric to keep a regression visible.
+            List<RawPiece> kept = new List<RawPiece>(pieces.Count);
+            RawPiece? previous = null;
+            foreach (RawPiece piece in pieces)
+            {
+                if (previous != null
+                    && previous.HasOffsets
+                    && piece.HasOffsets
+                    && piece.StartOffset >= previous.StartOffset
+                    && piece.EndOffset <= previous.EndOffset)
+                {
+                    ChunkingMetrics.ChunksSuppressed.Add(1);
+                    continue;
+                }
+
+                kept.Add(piece);
+                previous = piece;
+            }
+
+            return kept;
+        }
+
+        private List<RawPiece> ApplySmallChunkMode(List<RawPiece> pieces, ChunkingOptions options, ITokenizerAdapter tokenizer, int workingBudget, string? source)
         {
             if (options.SmallChunkMode == SmallChunkModeEnum.Drop)
             {
@@ -358,10 +396,10 @@ namespace TextChunker.Chunking
                 int previousTokens = tokenizer.CountTokens(previous.Text);
                 if (previousTokens < options.MinChunkTokens)
                 {
-                    string candidateText = previous.Text + "\n" + piece.Text;
-                    if (tokenizer.CountTokens(candidateText) <= workingBudget)
+                    RawPiece candidate = MergePieces(previous, piece, source);
+                    if (tokenizer.CountTokens(candidate.Text) <= workingBudget)
                     {
-                        merged[merged.Count - 1] = new RawPiece(candidateText, previous.HeaderContext, previous.OffsetEligible && piece.OffsetEligible);
+                        merged[merged.Count - 1] = candidate;
                         continue;
                     }
                 }
@@ -377,16 +415,49 @@ namespace TextChunker.Chunking
                 if (tokenizer.CountTokens(last.Text) < options.MinChunkTokens)
                 {
                     RawPiece previous = merged[merged.Count - 2];
-                    string candidateText = previous.Text + "\n" + last.Text;
-                    if (tokenizer.CountTokens(candidateText) <= workingBudget)
+                    RawPiece candidate = MergePieces(previous, last, source);
+                    if (tokenizer.CountTokens(candidate.Text) <= workingBudget)
                     {
-                        merged[merged.Count - 2] = new RawPiece(candidateText, previous.HeaderContext, previous.OffsetEligible && last.OffsetEligible);
+                        merged[merged.Count - 2] = candidate;
                         merged.RemoveAt(merged.Count - 1);
                     }
                 }
             }
 
             return merged;
+        }
+
+        private static RawPiece MergePieces(RawPiece first, RawPiece second, string? source)
+        {
+            // When both pieces are spans of the same source and only whitespace separates them, the merge is the
+            // source span that covers both, which keeps the original separator and exact offsets. Otherwise the texts
+            // are joined with a newline and the merged piece has no offsets.
+            if (source != null
+                && first.HasOffsets
+                && second.HasOffsets
+                && second.StartOffset >= first.StartOffset
+                && second.EndOffset >= first.EndOffset
+                && string.Equals(first.HeaderContext, second.HeaderContext, StringComparison.Ordinal))
+            {
+                bool whitespaceGap = true;
+                for (int i = first.EndOffset; i < second.StartOffset; i++)
+                {
+                    if (!char.IsWhiteSpace(source[i]))
+                    {
+                        whitespaceGap = false;
+                        break;
+                    }
+                }
+
+                if (whitespaceGap)
+                {
+                    int start = first.StartOffset;
+                    int end = second.EndOffset;
+                    return new RawPiece(source.Substring(start, end - start), first.HeaderContext, start, end);
+                }
+            }
+
+            return new RawPiece(first.Text + "\n" + second.Text, first.HeaderContext);
         }
 
         private Chunk Enrich(
@@ -396,12 +467,11 @@ namespace TextChunker.Chunking
             ChunkingOptions options,
             ResolvedTokenizationProfile profile,
             ITokenizerAdapter tokenizer,
-            string? offsetSource,
-            bool offsetsAllowed,
-            ref int searchFrom)
+            bool offsetsAllowed)
         {
             string body = piece.Text;
-            string contextualized = options.ContextualizeHeaders && !string.IsNullOrEmpty(piece.HeaderContext)
+            bool contextualize = options.ContextualizeHeaders && !string.IsNullOrEmpty(piece.HeaderContext);
+            string contextualized = contextualize
                 ? piece.HeaderContext + "\n\n" + body
                 : body;
             string finalText = string.IsNullOrEmpty(options.ContextPrefix) ? contextualized : options.ContextPrefix + contextualized;
@@ -420,15 +490,13 @@ namespace TextChunker.Chunking
             if (options.ComputeTokenCounts)
                 chunk.TokenCount = tokenizer.CountTokens(finalText);
 
-            if (offsetsAllowed && piece.OffsetEligible && offsetSource != null)
+            // Offsets come straight from the span the strategy produced. They are reported only when the emitted text
+            // is exactly that span of the source, so source.Substring(StartOffset, EndOffset - StartOffset) always
+            // equals Text.
+            if (offsetsAllowed && !contextualize && piece.HasOffsets)
             {
-                int index = offsetSource.IndexOf(body, Math.Min(searchFrom, offsetSource.Length), StringComparison.Ordinal);
-                if (index >= 0)
-                {
-                    chunk.StartOffset = index;
-                    chunk.EndOffset = index + body.Length;
-                    searchFrom = index + 1;
-                }
+                chunk.StartOffset = piece.StartOffset;
+                chunk.EndOffset = piece.EndOffset;
             }
 
             if (options.ComputeHashes)
@@ -467,7 +535,12 @@ namespace TextChunker.Chunking
 
         private static int ComputeBudget(ChunkingOptions options, ResolvedTokenizationProfile profile)
         {
-            return Math.Max(1, Math.Min(options.MaxTokens, profile.EffectiveInputBudget));
+            // The safety margin protects the model input limit, so it comes off the resolved effective budget, not
+            // off MaxTokens. A caller whose MaxTokens is already well below the model limit is unaffected.
+            int margin = options.SafetyMarginTokens
+                + (int)Math.Ceiling(profile.EffectiveInputBudget * options.SafetyMarginPercentage);
+            int modelBudget = Math.Max(1, profile.EffectiveInputBudget - margin);
+            return Math.Max(1, Math.Min(options.MaxTokens, modelBudget));
         }
 
         private static Guid? ResolveParent(ContentRequest request, ChunkingOptions options)
@@ -527,6 +600,8 @@ namespace TextChunker.Chunking
                 HeaderContextSeparator = options.HeaderContextSeparator,
                 SmallChunkMode = options.SmallChunkMode,
                 MinChunkTokens = options.MinChunkTokens,
+                SafetyMarginTokens = options.SafetyMarginTokens,
+                SafetyMarginPercentage = options.SafetyMarginPercentage,
                 TrimWhitespace = options.TrimWhitespace,
                 MaxInputCharacters = options.MaxInputCharacters,
                 RegexTimeoutMilliseconds = options.RegexTimeoutMilliseconds,

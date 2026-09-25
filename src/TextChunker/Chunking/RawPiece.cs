@@ -1,8 +1,8 @@
 namespace TextChunker.Chunking
 {
     /// <summary>
-    /// An intermediate produced chunk before enrichment: its text, an optional breadcrumb header context, and
-    /// whether the text is a literal substring of the source so that character offsets can be resolved.
+    /// An intermediate produced chunk before enrichment: its text, an optional breadcrumb header context, and, when
+    /// the text is an exact substring of the source, its character offsets in that source.
     /// </summary>
     internal class RawPiece
     {
@@ -10,13 +10,24 @@ namespace TextChunker.Chunking
 
         internal string? HeaderContext { get; set; } = null;
 
-        internal bool OffsetEligible { get; set; } = false;
+        internal int StartOffset { get; set; } = -1;
 
-        internal RawPiece(string text, string? headerContext, bool offsetEligible)
+        internal int EndOffset { get; set; } = -1;
+
+        internal bool HasOffsets => StartOffset >= 0 && EndOffset >= StartOffset;
+
+        internal RawPiece(string text, string? headerContext)
         {
             Text = text ?? string.Empty;
             HeaderContext = headerContext;
-            OffsetEligible = offsetEligible;
+        }
+
+        internal RawPiece(string text, string? headerContext, int startOffset, int endOffset)
+        {
+            Text = text ?? string.Empty;
+            HeaderContext = headerContext;
+            StartOffset = startOffset;
+            EndOffset = endOffset;
         }
     }
 }

@@ -17,6 +17,8 @@ namespace TextChunker.Models
         private int? _OverlapCharacters = null;
         private int _RowGroupSize = 5;
         private int _MinChunkTokens = 0;
+        private int _SafetyMarginTokens = 0;
+        private double _SafetyMarginPercentage = 0.0;
         private int _MaxInputCharacters = 4_000_000;
         private int _RegexTimeoutMilliseconds = 5000;
         private string _HeaderContextSeparator = " > ";
@@ -46,7 +48,7 @@ namespace TextChunker.Models
 
         /// <summary>
         /// Overlap between chunks measured in tokens for token strategies and in whole units for unit strategies.
-        /// Default 0. Minimum 0.
+        /// Token overlap is made of whole words and never exceeds this many tokens. Default 0. Minimum 0.
         /// </summary>
         /// <exception cref="InvalidChunkingOptionsException">Thrown when set below 0.</exception>
         public int OverlapCount
@@ -139,6 +141,33 @@ namespace TextChunker.Models
         public int? EffectiveInputBudget { get; set; } = null;
 
         /// <summary>
+        /// Tokens held back from the resolved model input budget as a safety margin, for runtimes whose tokenizer can
+        /// count slightly more than the local tokenizer. The margin reduces the effective budget, not MaxTokens, so a
+        /// MaxTokens already below the model limit minus the margin is unaffected. Default 0. Minimum 0.
+        /// </summary>
+        /// <exception cref="InvalidChunkingOptionsException">Thrown when set below 0.</exception>
+        public int SafetyMarginTokens
+        {
+            get => _SafetyMarginTokens;
+            set => _SafetyMarginTokens = value >= 0
+                ? value
+                : throw new InvalidChunkingOptionsException("SafetyMarginTokens must be at least 0.");
+        }
+
+        /// <summary>
+        /// Fraction of the resolved model input budget held back as a safety margin, between 0.0 and 0.5. Added to
+        /// SafetyMarginTokens and rounded up. For example 0.04 on a 254 token budget holds back 11 tokens. Default 0.0.
+        /// </summary>
+        /// <exception cref="InvalidChunkingOptionsException">Thrown when set outside the range 0.0 to 0.5.</exception>
+        public double SafetyMarginPercentage
+        {
+            get => _SafetyMarginPercentage;
+            set => _SafetyMarginPercentage = value >= 0.0 && value <= 0.5
+                ? value
+                : throw new InvalidChunkingOptionsException("SafetyMarginPercentage must be between 0.0 and 0.5.");
+        }
+
+        /// <summary>
         /// When true and a calibration probe is configured, the resolver may calibrate the budget against a live
         /// endpoint. Default true.
         /// </summary>
@@ -150,8 +179,10 @@ namespace TextChunker.Models
         public bool ComputeTokenCounts { get; set; } = true;
 
         /// <summary>
-        /// When true, each chunk's source character offsets are computed where the chunk is a literal substring.
-        /// Default true.
+        /// When true, each chunk's source character offsets are computed. Offsets are taken from the exact source span
+        /// the strategy produced, so the source substring at the offsets always equals the chunk text. Chunks that are
+        /// not a literal substring (serialized lists and tables, a ContextPrefix, contextualized headers, or small
+        /// chunks merged across non whitespace) keep -1. Default true.
         /// </summary>
         public bool ComputeOffsets { get; set; } = true;
 

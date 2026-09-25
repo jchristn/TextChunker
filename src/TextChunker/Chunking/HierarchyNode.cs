@@ -1,11 +1,10 @@
 namespace TextChunker.Chunking
 {
     using System.Collections.Generic;
-    using System.Linq;
 
     /// <summary>
-    /// A node in a header hierarchy built from markdown style headings. Each node owns the content lines that
-    /// appear under its heading and before any deeper heading.
+    /// A node in a header hierarchy built from markdown style headings. Each node owns the range of source text that
+    /// appears under its heading and before the next heading.
     /// </summary>
     internal class HierarchyNode
     {
@@ -17,7 +16,9 @@ namespace TextChunker.Chunking
 
         internal List<HierarchyNode> Children { get; } = new List<HierarchyNode>();
 
-        internal List<string> ContentLines { get; } = new List<string>();
+        internal int ContentStart { get; set; } = -1;
+
+        internal int ContentEnd { get; set; } = -1;
 
         internal string BuildBreadcrumb(string separator)
         {
@@ -34,9 +35,10 @@ namespace TextChunker.Chunking
             return string.Join(separator, titles);
         }
 
-        internal string GetContent()
+        internal SourceSpan GetContentSpan(string source)
         {
-            return string.Join("\n", ContentLines).Trim();
+            if (ContentStart < 0 || ContentEnd <= ContentStart) return new SourceSpan(0, 0);
+            return ChunkingHelpers.Trim(source, new SourceSpan(ContentStart, ContentEnd));
         }
     }
 }

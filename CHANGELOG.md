@@ -5,6 +5,91 @@ All notable changes to TextChunker are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the version is below 1.0.0, any
 release may carry breaking changes.
 
+## [0.3.0] - 2026-09-24
+
+This release replaces the token slicing core. Every text strategy now works on spans of the original source
+text, and the BERT WordPiece tokenizer is reimplemented to match what embedding runtimes actually count.
+Chunk boundaries move for most inputs, so re chunk and re embed stored content if you depend on stable
+boundaries.
+
+### Fixed
+
+- WordPiece chunking no longer throws `ArgumentException: String contains invalid Unicode code points` on
+  text that contains emoji or other astral characters after line breaks. Cut positions were computed in
+  the tokenizer's normalized text coordinates and applied to the original text, so they drifted by the
+  number of characters the normalizer removed and could land between the two halves of a surrogate pair.
+- WordPiece chunk boundaries no longer drift earlier through multi line documents. The same coordinate
+  mismatch made chunks overlap or cut words in half even with `OverlapCount = 0`.
+- Fixed token chunking with overlap no longer emits a run of short, repeated chunks at the end of a
+  document, each contained in the one before it. Chunks now have strictly increasing starts and ends.
+- Every chunk from a text strategy now has resolved offsets. Offsets are taken from the span that produced
+  the chunk instead of searching the source for the chunk text, so duplicate chunks, repeated passages,
+  CRLF line endings, and sentence or paragraph chunks joined across different whitespace no longer report
+  `-1` or a wrong location. On a CRLF novel, `Recursive` previously reported `-1` for every chunk and
+  `SentenceBased` for most of them.
+- WordPiece token counts now match the embedding runtime. Measured against Ollama `all-minilm` over 43
+  inputs covering every normalization rule, 42 match exactly and the remaining one counts higher, never
+  lower. Previously accented words became single `[UNK]` tokens, line breaks and tabs were deleted (fusing
+  the words around them), and emoji, currency and math symbols, and ASCII characters such as `$ + = < > |`
+  were dropped entirely, so chunks sized to the budget could be rejected by the model.
+- `SharpTokenTokenizerAdapter.SliceByTokenRange` and `MlTokenizerAdapter.SliceByTokenRange` no longer return
+  U+FFFD or a lone surrogate when a token range starts or ends inside a multi byte character. The
+  SharpToken adapter now returns an exact substring of the input, and consecutive slices tile the text.
+- `Recursive` no longer drops separator content at chunk boundaries. A heading marker or keyword that opens
+  a block (`\n## `, `\nclass `) stays with the following chunk, and sentence punctuation (`. `) stays with
+  the preceding chunk; only the separator's whitespace is discarded.
+
+### Changed
+
+- **Breaking (behavior):** the token window (`FixedTokenCount`, and the fallback every other strategy uses
+  for an oversized unit) cuts on word boundaries instead of mid word. A word that alone exceeds the budget
+  is split at grapheme cluster boundaries, so a cut never separates a surrogate pair, an emoji ZWJ sequence,
+  or a base character from its combining marks. Overlap is measured in whole words and never exceeds
+  `OverlapCount` tokens.
+- **Breaking (behavior):** `SentenceBased`, `ParagraphBased`, `Recursive`, and `ListEntry` chunks keep the
+  original text between their units (for example the blank line between paragraphs) instead of re joining
+  units with a fixed separator, so every chunk is an exact substring of the source.
+- **Breaking (behavior):** `BertWordPieceTokenizerAdapter` is now a faithful port of the Hugging Face BERT
+  basic tokenizer and greedy WordPiece algorithm instead of a wrapper over `Microsoft.ML.Tokenizers`.
+  Accents are stripped, all whitespace (including `\n`, `\t`, `\r`, `\v`, `\f`, NBSP, and line separators)
+  separates words, control and zero width format characters are removed, ASCII and Unicode punctuation are
+  split into their own tokens, and an unknown word becomes one `[UNK]`. Counts rise on accented, symbol
+  heavy, and emoji text and change on multi line text. `Encode` returns identifiers without `[CLS]` and
+  `[SEP]`, consistent with `CountTokens`, and `SliceByTokenRange` returns the exact original text covered by
+  the token range.
+- `SentenceBoundaryAware` and `SemanticBoundaryAware` overlap now choose, among the sentence or paragraph
+  starts inside the chunk, the one whose overlap is closest to the requested amount, instead of snapping to
+  the last boundary anywhere before the window.
+- Hierarchy aware chunks now carry exact source offsets, including for CRLF input. A chunk whose text has a
+  contextualized header prepended reports `-1`, since its text is not a source substring.
+- `MergeForward` small chunk handling merges adjacent source spans when only whitespace separates them, which
+  keeps the original separator and exact offsets. Pieces that cannot be merged that way are still joined
+  with a newline and report `-1`.
+- Chunking is substantially faster. On a 622 KB novel, fixed token chunking with overlap dropped from about
+  21 s to under 1 s with cl100k (excluding the one time encoder load) and from about 31 s to under 1 s with
+  WordPiece, and the sentence and recursive strategies run roughly two to four times faster.
+
+### Added
+
+- `ChunkingOptions.SafetyMarginTokens` and `ChunkingOptions.SafetyMarginPercentage` hold back part of the
+  resolved model budget for runtimes whose tokenizer can count slightly more than the local one. The margin
+  comes off the model's effective budget, not off a `MaxTokens` that is already smaller. Both default to 0.
+- `WordPieceOptions` (`LowerCase`, `StripAccents`, `TokenizeCjkCharacters`, `MaxInputCharactersPerWord`,
+  `UnknownToken`) and `BertWordPieceTokenizerAdapter` constructors that take options or a caller supplied
+  `vocab.txt` stream, for example a cased BERT vocabulary. `MaxInputCharactersPerWord` defaults to 0 (no
+  limit) because llama.cpp based runtimes segment long words fully instead of collapsing them to one
+  `[UNK]` as Hugging Face does; the higher count is the safe one.
+- The `textchunker.chunks_suppressed` counter on the `TextChunker` meter. A backstop drops any chunk whose
+  source span lies inside the previous chunk's span and counts it here. The span based strategies never
+  produce one, so a nonzero value signals a regression.
+- A `--write-parity-golden <path>` option on `Test.Automated` that recomputes the chunk boundary fixture for
+  review and re approval after an intended boundary change.
+
+### Removed
+
+- The internal decode and re encode slicing loop and its sentence and paragraph boundary adjusters, which
+  worked in token positions that did not correspond to the text they sliced.
+
 ## [0.2.2] - 2026-09-23
 
 ### Added

@@ -16,10 +16,12 @@ Xamarin.
 ## Why it exists
 
 Most chunkers make you choose between correct token counting and a clean API. TextChunker gives you
-both. The token budget is enforced by re encoding every slice and shrinking it until it provably fits,
-so a 512 token limit means 512 tokens, not an estimate that overflows the moment you send it to a model.
-The tokenizer is pluggable: cl100k for OpenAI style models and BERT WordPiece for MiniLM, BGE, and E5,
-with the vocabulary embedded in the assembly so counts are correct offline with no external file.
+both. Every chunk is an exact span of your text, cut on word boundaries, and its real token count is
+verified before it is emitted, so a 512 token limit means 512 tokens, not an estimate that overflows the
+moment you send it to a model. The tokenizer is pluggable: cl100k and o200k for OpenAI style models and
+BERT WordPiece for MiniLM, BGE, E5, and Nomic, with the vocabulary embedded in the assembly so counts are
+correct offline with no external file. The WordPiece tokenizer reproduces what embedding runtimes such as
+Ollama and sentence-transformers count, including accents, emoji, symbols, and line breaks.
 
 The result object was designed to survive the trip into a vector store. Each chunk carries a parent
 identifier, a zero based ordinal, its token and character counts, and, for text strategies, the exact
@@ -99,7 +101,7 @@ list.
 
 | Strategy | Input | Behavior |
 |---|---|---|
-| `FixedTokenCount` | text | Sliding token window with optional overlap |
+| `FixedTokenCount` | text | Sliding token window cut on word boundaries, with optional overlap |
 | `Recursive` | text | Recursively splits on a separator ladder, then merges to fill the budget |
 | `SentenceBased` | text | Groups whole sentences up to the budget |
 | `ParagraphBased` | text | Groups paragraphs, falling back to sentences when one is too large |
@@ -113,8 +115,10 @@ list.
 | `WholeTable` | table | The whole table as one markdown table |
 
 Every strategy degrades gracefully. A paragraph larger than the budget becomes sentences, an oversized
-sentence becomes token spans, and an oversized table group becomes rows, then cells, then token spans.
-Cell values that contain a pipe are escaped so serialized markdown stays intact.
+sentence becomes token windows, and an oversized table group becomes rows, then cells, then token windows.
+A single word larger than the budget is split at grapheme boundaries, so no cut ever breaks a surrogate
+pair, an emoji sequence, or an accented character. Cell values that contain a pipe are escaped so
+serialized markdown stays intact.
 
 The `Recursive` strategy is the one to reach for on structured text. It walks a ladder of separators
 (paragraph, line, sentence, word by default) and only descends to a finer split when a piece still
@@ -124,7 +128,9 @@ overflows, then merges neighbors back up to the budget. Set `Format` to `Markdow
 
 Overlap can be expressed three ways. `OverlapCount` is a token count, `OverlapPercentage` is a fraction
 of the chunk size, and `OverlapCharacters` is a character count converted to an approximate token
-overlap. Percentage wins over characters, which wins over count when more than one is set.
+overlap. Percentage wins over characters, which wins over count when more than one is set. Token overlap
+is measured in whole words and never exceeds the requested amount, and each chunk always ends past the
+previous one, so overlap never produces repeated or redundant tail chunks.
 
 ## Tokenizers and budgets
 
@@ -152,7 +158,10 @@ ChunkingOptions options = new ChunkingOptions
 ```
 
 The actual budget enforced is the smaller of your `MaxTokens` and the model's limit, so a chunk never
-exceeds either. If you host models behind an endpoint that reports a different limit, implement
+exceeds either. Local counts approximate the runtime's, and a runtime can occasionally count more (for
+example a model mapped to a vocabulary it does not actually use). `SafetyMarginTokens` and
+`SafetyMarginPercentage` hold back part of the model budget for that case; see
+[docs/TOKENIZERS.md](docs/TOKENIZERS.md). If you host models behind an endpoint that reports a different limit, implement
 `ITokenizerCalibrationProbe` and pass it to the chunker to discover the true budget at runtime. The core
 package opens no network connections on its own.
 
@@ -167,7 +176,7 @@ public class Chunk
     public string Text;
     public int TokenCount;
     public int CharacterCount;
-    public int StartOffset;        // source offset, or -1 for serialized list/table output
+    public int StartOffset;        // source offset of Text, or -1 when Text is not a source substring
     public int EndOffset;
     public ChunkStrategyEnum Strategy;
     public string TokenizerModel;
@@ -181,15 +190,17 @@ public class Chunk
 
 Offsets, hashes, and token counts are each optional, controlled by their own flag. `ComputeOffsets` and
 `ComputeTokenCounts` are on by default; `ComputeHashes` is off. Each one does real work per chunk: token
-counting runs the tokenizer again, hashing computes three digests over the chunk bytes, and offset
-resolution searches the source for the chunk. Turn off whatever you do not need and it is not computed.
+counting runs the tokenizer again and hashing computes three digests over the chunk bytes; offsets come
+from the span each chunk was cut from, so for every text strategy `source.Substring(StartOffset,
+EndOffset - StartOffset)` equals `Text`. Turn off whatever you do not need and it is not computed.
 
 ## Hierarchy aware chunking
 
 Turn on `HierarchyAware` and TextChunker parses a markdown header tree, chunks each section, and stamps
 every chunk with a breadcrumb such as `Guide > Setup > Windows` in `HeaderContext`. Set
 `ContextualizeHeaders` to prepend that breadcrumb into the chunk text itself for better embeddings; its
-token cost is charged against the budget rather than silently inflating the chunk.
+token cost is charged against the budget rather than silently inflating the chunk. Section chunks keep exact
+source offsets unless the breadcrumb is prepended to their text.
 
 ## Dependency injection
 
@@ -285,6 +296,7 @@ The `Meter` named `TextChunker` publishes:
 |---|---|---|
 | `textchunker.chunks_produced` | Counter (long) | Total number of chunks produced. |
 | `textchunker.chunk_tokens` | Histogram (int) | Token count of each chunk, recorded when token counting is enabled. |
+| `textchunker.chunks_suppressed` | Counter (long) | Chunks dropped because their source span lay inside the previous chunk. Expected to stay at zero; a nonzero value signals a regression. |
 
 ## Try it interactively
 

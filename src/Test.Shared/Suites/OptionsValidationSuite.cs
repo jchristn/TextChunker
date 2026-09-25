@@ -53,6 +53,41 @@ namespace Test.Shared.Suites
                             return Task.CompletedTask;
                         }),
 
+                    new TestCaseDescriptor("OptionsValidation", "SafetyMarginOutOfRange", "A negative safety margin or a percentage outside 0 to 0.5 is rejected",
+                        executeAsync: ct =>
+                        {
+                            ExpectInvalid(() => new ChunkingOptions { SafetyMarginTokens = -1 });
+                            ExpectInvalid(() => new ChunkingOptions { SafetyMarginPercentage = -0.01 });
+                            ExpectInvalid(() => new ChunkingOptions { SafetyMarginPercentage = 0.51 });
+                            ChunkingOptions valid = new ChunkingOptions { SafetyMarginTokens = 0, SafetyMarginPercentage = 0.5 };
+                            TestSupport.Assert(valid.SafetyMarginPercentage == 0.5 && valid.SafetyMarginTokens == 0, "boundary values should be accepted");
+                            return Task.CompletedTask;
+                        }),
+
+                    new TestCaseDescriptor("OptionsValidation", "SafetyMarginShrinksModelBudget", "The safety margin comes off the model budget, not off a smaller MaxTokens",
+                        executeAsync: async ct =>
+                        {
+                            Chunker chunker = new Chunker();
+                            string source = TestSupport.WordCorpus(800);
+
+                            ChunkingResult plain = await chunker.ChunkToResultAsync(source, new ChunkingOptions { ModelId = "all-minilm", MaxTokens = 512 }, ct);
+                            TestSupport.Assert(plain.Diagnostic.EffectiveTokenBudget == 254, "all-minilm should resolve to 254, got " + plain.Diagnostic.EffectiveTokenBudget);
+
+                            ChunkingResult percent = await chunker.ChunkToResultAsync(source, new ChunkingOptions { ModelId = "all-minilm", MaxTokens = 512, SafetyMarginPercentage = 0.04 }, ct);
+                            TestSupport.Assert(percent.Diagnostic.EffectiveTokenBudget == 243, "4 percent of 254 rounds up to 11, leaving 243, got " + percent.Diagnostic.EffectiveTokenBudget);
+                            foreach (Chunk c in percent.Chunks)
+                                TestSupport.Assert(c.TokenCount <= 243, "chunk over the margin adjusted budget: " + c.TokenCount);
+
+                            ChunkingResult both = await chunker.ChunkToResultAsync(source, new ChunkingOptions { ModelId = "all-minilm", MaxTokens = 512, SafetyMarginTokens = 4, SafetyMarginPercentage = 0.04 }, ct);
+                            TestSupport.Assert(both.Diagnostic.EffectiveTokenBudget == 239, "token and percentage margins should add, got " + both.Diagnostic.EffectiveTokenBudget);
+
+                            ChunkingResult smallMax = await chunker.ChunkToResultAsync(source, new ChunkingOptions { ModelId = "all-minilm", MaxTokens = 100, SafetyMarginTokens = 20 }, ct);
+                            TestSupport.Assert(smallMax.Diagnostic.EffectiveTokenBudget == 100, "a MaxTokens below the adjusted model budget should be unaffected");
+
+                            ChunkingResult huge = await chunker.ChunkToResultAsync("short text here", new ChunkingOptions { ModelId = "all-minilm", SafetyMarginTokens = 100000 }, ct);
+                            TestSupport.Assert(huge.Diagnostic.EffectiveTokenBudget == 1, "a margin larger than the budget should clamp to 1");
+                        }),
+
                     new TestCaseDescriptor("OptionsValidation", "OversizeInputThrows", "Input over MaxInputCharacters throws when chunked",
                         executeAsync: async ct =>
                         {

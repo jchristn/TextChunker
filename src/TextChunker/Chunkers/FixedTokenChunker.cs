@@ -2,16 +2,15 @@ namespace TextChunker.Chunkers
 {
     using System.Collections.Generic;
     using TextChunker.Chunking;
-    using TextChunker.Tokenization;
 
     /// <summary>
-    /// Splits text into chunks of a fixed token count with optional overlap.
+    /// Splits text into windows of at most a fixed token count, cut on word boundaries, with optional overlap.
     /// </summary>
     internal static class FixedTokenChunker
     {
-        internal static List<string> Chunk(string text, ChunkingConfiguration config, ITokenizerAdapter tokenizer, int tokenLimit)
+        internal static List<SourceSpan> Chunk(ChunkingContext context, SourceSpan range, int tokenLimit)
         {
-            return ChunkingHelpers.ChunkByTokenSpans(text, config, tokenizer, tokenLimit);
+            return ChunkingHelpers.ChunkByTokenWindow(context, range, tokenLimit);
         }
     }
 }

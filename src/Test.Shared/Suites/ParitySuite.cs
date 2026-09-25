@@ -54,6 +54,27 @@ namespace Test.Shared.Suites
                 });
         }
 
+        /// <summary>
+        /// Recompute every golden case with the current sizing core and return the fixture JSON. Used only to re
+        /// approve the fixture after an intended boundary change; the caller decides where to write it.
+        /// </summary>
+        /// <returns>Indented fixture JSON.</returns>
+        public static string ComputeGoldenJson()
+        {
+            ITokenizerAdapter tokenizer = new SharpTokenTokenizerAdapter("cl100k_base");
+            List<ParityGoldenCase> cases = LoadGolden();
+            foreach (ParityGoldenCase golden in cases)
+                golden.Chunks = Chunk(golden, tokenizer);
+
+            JsonSerializerOptions options = new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            };
+            return JsonSerializer.Serialize(cases, options);
+        }
+
         private static List<string> Chunk(ParityGoldenCase golden, ITokenizerAdapter tokenizer)
         {
             ChunkStrategyEnum strategy = MapStrategy(golden.Strategy);
@@ -64,11 +85,20 @@ namespace Test.Shared.Suites
                 OverlapCount = golden.Overlap
             };
 
+            ChunkingContext context = new ChunkingContext(golden.Text, config, tokenizer);
+            SourceSpan range = new SourceSpan(0, golden.Text.Length);
+            List<SourceSpan> spans;
             if (strategy == ChunkStrategyEnum.SentenceBased)
-                return SentenceChunker.Chunk(golden.Text, config, tokenizer, golden.MaxTokens);
-            if (strategy == ChunkStrategyEnum.ParagraphBased)
-                return ParagraphChunker.Chunk(golden.Text, config, tokenizer, golden.MaxTokens);
-            return FixedTokenChunker.Chunk(golden.Text, config, tokenizer, golden.MaxTokens);
+                spans = SentenceChunker.Chunk(context, range, golden.MaxTokens);
+            else if (strategy == ChunkStrategyEnum.ParagraphBased)
+                spans = ParagraphChunker.Chunk(context, range, golden.MaxTokens);
+            else
+                spans = FixedTokenChunker.Chunk(context, range, golden.MaxTokens);
+
+            List<string> texts = new List<string>(spans.Count);
+            foreach (SourceSpan span in spans)
+                texts.Add(context.Text(span));
+            return texts;
         }
 
         private static ChunkStrategyEnum MapStrategy(string strategy)

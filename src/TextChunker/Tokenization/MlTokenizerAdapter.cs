@@ -45,19 +45,42 @@ namespace TextChunker.Tokenization
             return _Tokenizer.Decode(tokenIds.ToArray());
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Return the text covered by a range of tokens. When the wrapped tokenizer does not normalize its input, token
+        /// offsets index the original text and the result is an exact substring, widened or narrowed so it never
+        /// splits a surrogate pair. When it does normalize, offsets refer to the normalized text, so the range is
+        /// decoded instead and any U+FFFD produced by a partial character at either edge is removed.
+        /// </summary>
+        /// <param name="text">Source text.</param>
+        /// <param name="startTokenIndex">Zero based token index to start from. Must be at least 0.</param>
+        /// <param name="tokenCount">Number of tokens to include. Values of 0 or less return an empty string.</param>
+        /// <returns>Text for the requested token range.</returns>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown when startTokenIndex is negative.</exception>
         public string SliceByTokenRange(string text, int startTokenIndex, int tokenCount)
         {
-            if (string.IsNullOrEmpty(text) || tokenCount <= 0) return string.Empty;
             if (startTokenIndex < 0) throw new ArgumentOutOfRangeException(nameof(startTokenIndex));
+            if (string.IsNullOrEmpty(text) || tokenCount <= 0) return string.Empty;
 
-            IReadOnlyList<int> ids = _Tokenizer.EncodeToIds(text);
-            if (startTokenIndex >= ids.Count) return string.Empty;
+            IReadOnlyList<EncodedToken> tokens = _Tokenizer.EncodeToTokens(text, out string? normalizedText);
+            if (startTokenIndex >= tokens.Count) return string.Empty;
 
-            int count = Math.Min(tokenCount, ids.Count - startTokenIndex);
+            int count = Math.Min(tokenCount, tokens.Count - startTokenIndex);
             if (count <= 0) return string.Empty;
 
-            return _Tokenizer.Decode(ids.Skip(startTokenIndex).Take(count).ToArray());
+            if (normalizedText == null || string.Equals(normalizedText, text, StringComparison.Ordinal))
+            {
+                int start = tokens[startTokenIndex].Offset.Start.GetOffset(text.Length);
+                int end = tokens[startTokenIndex + count - 1].Offset.End.GetOffset(text.Length);
+                start = Math.Max(0, Math.Min(start, text.Length));
+                end = Math.Max(start, Math.Min(end, text.Length));
+                if (start > 0 && start < text.Length && char.IsLowSurrogate(text[start]) && char.IsHighSurrogate(text[start - 1])) start--;
+                if (end > 0 && end < text.Length && char.IsLowSurrogate(text[end]) && char.IsHighSurrogate(text[end - 1])) end++;
+                return text.Substring(start, end - start);
+            }
+
+            string decoded = _Tokenizer.Decode(tokens.Skip(startTokenIndex).Take(count).Select(token => token.Id).ToArray()) ?? string.Empty;
+            if (text.IndexOf('\uFFFD') < 0) decoded = decoded.Trim('\uFFFD');
+            return decoded;
         }
     }
 }
