@@ -117,8 +117,9 @@ list.
 Every strategy degrades gracefully. A paragraph larger than the budget becomes sentences, an oversized
 sentence becomes token windows, and an oversized table group becomes rows, then cells, then token windows.
 A single word larger than the budget is split at grapheme boundaries, so no cut ever breaks a surrogate
-pair, an emoji sequence, or an accented character. Cell values that contain a pipe are escaped so
-serialized markdown stays intact.
+pair, an emoji sequence, or an accented character. When a split would leave a tiny remainder, the last two
+pieces are evened out instead, so retrieval is not crowded with fragments. Cell values that contain a pipe
+are escaped so serialized markdown stays intact.
 
 The `Recursive` strategy is the one to reach for on structured text. It walks a ladder of separators
 (paragraph, line, sentence, word by default) and only descends to a finer split when a piece still

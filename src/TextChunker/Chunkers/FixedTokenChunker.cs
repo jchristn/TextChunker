@@ -10,7 +10,7 @@ namespace TextChunker.Chunkers
     {
         internal static List<SourceSpan> Chunk(ChunkingContext context, SourceSpan range, int tokenLimit)
         {
-            return ChunkingHelpers.ChunkByTokenWindow(context, range, tokenLimit);
+            return ChunkingHelpers.ChunkByTokenWindow(context, range, tokenLimit, false);
         }
     }
 }

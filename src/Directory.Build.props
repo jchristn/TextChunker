@@ -9,7 +9,7 @@
     <Company>Joel Christner</Company>
     <Product>TextChunker</Product>
     <Copyright>Copyright (c) Joel Christner</Copyright>
-    <Version>0.3.0</Version>
+    <Version>0.3.1</Version>
   </PropertyGroup>
 
 </Project>

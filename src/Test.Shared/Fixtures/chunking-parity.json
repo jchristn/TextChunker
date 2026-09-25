@@ -223,8 +223,8 @@
     "chunks": [
       "The quick brown fox jumps over the lazy dog. A second sentence follows here!",
       "Does a third one appear?",
-      "Indeed it does, with more words to push the token count up higher and",
-      "higher."
+      "Indeed it does, with more words to",
+      "push the token count up higher and higher."
     ]
   },
   {

@@ -65,88 +65,193 @@ namespace TextChunker.Chunking
                 return;
             }
 
-            int standalone = gapStart == start ? tokens : context.Count(start, end);
+            // The gap is whitespace, which costs at most a token per character, so the word alone only needs a
+            // recount when the gap could account for the overflow.
+            int gapLength = start - gapStart;
+            int standalone = gapLength == 0 || tokens - gapLength > tokenLimit ? tokens : context.Count(start, end);
             if (standalone <= tokenLimit)
             {
                 units.Add(new TokenUnit(gapStart, start, end, standalone));
                 return;
             }
 
-            SplitOversized(context, units, gapStart, start, end, tokenLimit);
+            SplitOversized(context, units, gapStart, start, end, tokenLimit, standalone);
         }
 
-        private static void SplitOversized(ChunkingContext context, List<TokenUnit> units, int gapStart, int start, int end, int tokenLimit)
+        private static void SplitOversized(ChunkingContext context, List<TokenUnit> units, int gapStart, int start, int end, int tokenLimit, int wordTokens)
         {
             string source = context.Source;
             List<int> boundaries = GraphemeBoundaries(source, start, end);
+            double elementsPerToken = (double)(boundaries.Count - 1) / Math.Max(1, wordTokens);
             int position = 0;
             bool first = true;
+            int previousPiece = -1;
+            int lastPiece = -1;
 
             while (position < boundaries.Count - 1)
             {
                 int pieceStart = boundaries[position];
-                int fit = LargestFit(context, pieceStart, boundaries, position + 1, boundaries.Count - 1, tokenLimit, Math.Max(1, tokenLimit));
+                int guess = position + Math.Max(1, (int)(tokenLimit * elementsPerToken * 0.97));
+                int fit = LargestFit(context, pieceStart, boundaries, position + 1, boundaries.Count - 1, tokenLimit, guess, out int fitTokens);
 
                 int pieceEnd;
+                int pieceTokens;
                 int nextPosition;
                 if (fit < 0)
                 {
                     // A single grapheme is over budget, so fall back to code point boundaries inside it. A lone code
                     // point that is still over budget is kept whole, since cutting it would corrupt the text.
                     List<int> codePoints = CodePointBoundaries(source, pieceStart, boundaries[position + 1]);
-                    int codePointFit = LargestFit(context, pieceStart, codePoints, 1, codePoints.Count - 1, tokenLimit, 1);
+                    int codePointFit = LargestFit(context, pieceStart, codePoints, 1, codePoints.Count - 1, tokenLimit, 1, out int codePointTokens);
                     pieceEnd = codePoints[codePointFit < 0 ? 1 : codePointFit];
+                    pieceTokens = codePointFit < 0 ? context.Count(pieceStart, pieceEnd) : codePointTokens;
                     nextPosition = pieceEnd == boundaries[position + 1] ? position + 1 : position;
                     if (nextPosition == position) boundaries[position] = pieceEnd;
+                    previousPiece = -1;
+                    lastPiece = -1;
                 }
                 else
                 {
                     pieceEnd = boundaries[fit];
+                    pieceTokens = fitTokens;
                     nextPosition = fit;
+                    if (fitTokens > 0) elementsPerToken = (double)(fit - position) / fitTokens;
+                    previousPiece = lastPiece;
+                    lastPiece = position;
                 }
 
-                units.Add(new TokenUnit(first ? gapStart : pieceStart, pieceStart, pieceEnd, context.Count(pieceStart, pieceEnd)));
+                units.Add(new TokenUnit(first ? gapStart : pieceStart, pieceStart, pieceEnd, pieceTokens));
                 first = false;
                 position = nextPosition;
             }
+
+            if (previousPiece >= 0 && lastPiece > previousPiece && units.Count >= 2)
+                BalanceLastPieces(context, units, boundaries, previousPiece, lastPiece, tokenLimit);
         }
 
-        private static int LargestFit(ChunkingContext context, int start, List<int> boundaries, int from, int max, int tokenLimit, int initialStep)
+        private static void BalanceLastPieces(ChunkingContext context, List<TokenUnit> units, List<int> boundaries, int previousPiece, int lastPiece, int tokenLimit)
         {
-            if (from > max) return -1;
-            if (context.Count(start, boundaries[from]) > tokenLimit) return -1;
+            // The final piece of a split word is the remainder and may be tiny. Move the cut between the last two
+            // pieces to the grapheme boundary that makes them most even, so the word does not end in a fragment.
+            TokenUnit tail = units[units.Count - 1];
+            if (tail.Tokens * 4 >= tokenLimit) return;
 
-            int good = from;
-            int step = initialStep;
-            while (good < max)
+            int start = boundaries[previousPiece];
+            int end = boundaries[boundaries.Count - 1];
+            int low = previousPiece + 1;
+            int high = lastPiece;
+            while (low < high)
             {
-                int candidate = Math.Min(max, good + step);
-                if (context.Count(start, boundaries[candidate]) <= tokenLimit)
-                {
-                    good = candidate;
-                    step *= 2;
-                    continue;
-                }
+                int middle = low + ((high - low) / 2);
+                if (context.Count(start, boundaries[middle]) >= context.Count(boundaries[middle], end)) high = middle;
+                else low = middle + 1;
+            }
 
-                int low = good + 1;
-                int high = candidate - 1;
-                while (low <= high)
+            TokenUnit head = units[units.Count - 2];
+            int best = lastPiece;
+            int bestLargest = Math.Max(head.Tokens, tail.Tokens);
+            int bestLeft = head.Tokens;
+            int bestRight = tail.Tokens;
+            for (int candidate = Math.Max(previousPiece + 1, low - 1); candidate <= Math.Min(lastPiece, low); candidate++)
+            {
+                int left = context.Count(start, boundaries[candidate]);
+                int right = context.Count(boundaries[candidate], end);
+                if (left <= tokenLimit && right <= tokenLimit && Math.Max(left, right) < bestLargest)
                 {
-                    int middle = low + ((high - low) / 2);
-                    if (context.Count(start, boundaries[middle]) <= tokenLimit)
+                    best = candidate;
+                    bestLargest = Math.Max(left, right);
+                    bestLeft = left;
+                    bestRight = right;
+                }
+            }
+
+            if (best == lastPiece) return;
+            units[units.Count - 2] = new TokenUnit(head.GapStart, start, boundaries[best], bestLeft);
+            units[units.Count - 1] = new TokenUnit(boundaries[best], boundaries[best], end, bestRight);
+        }
+
+        private static int LargestFit(ChunkingContext context, int start, List<int> boundaries, int from, int max, int tokenLimit, int guess, out int count)
+        {
+            // Returns the largest boundary index in [from, max] whose prefix fits the budget, or -1 when even the
+            // first boundary does not fit. The search starts at the caller's estimate of the fill point, gallops
+            // toward the answer in small steps, and finishes with a binary search, so a piece costs a handful of
+            // counts instead of a scan.
+            count = 0;
+            if (from > max) return -1;
+
+            int candidate = Math.Max(from, Math.Min(max, guess));
+            int good;
+            int goodCount;
+            int bad = max + 1;
+            int probeCount = context.Count(start, boundaries[candidate]);
+            if (probeCount <= tokenLimit)
+            {
+                good = candidate;
+                goodCount = probeCount;
+            }
+            else
+            {
+                bad = candidate;
+                if (candidate == from) return -1;
+
+                int step = Math.Max(1, (candidate - from) / 32);
+                while (true)
+                {
+                    int probe = Math.Max(from, bad - step);
+                    probeCount = context.Count(start, boundaries[probe]);
+                    if (probeCount <= tokenLimit)
                     {
-                        good = middle;
-                        low = middle + 1;
+                        good = probe;
+                        goodCount = probeCount;
+                        break;
+                    }
+
+                    bad = probe;
+                    if (probe == from) return -1;
+                    step *= 2;
+                }
+            }
+
+            if (bad > max)
+            {
+                int step = Math.Max(1, (good - from + 1) / 32);
+                while (good < max)
+                {
+                    int probe = Math.Min(max, good + step);
+                    probeCount = context.Count(start, boundaries[probe]);
+                    if (probeCount <= tokenLimit)
+                    {
+                        good = probe;
+                        goodCount = probeCount;
+                        step *= 2;
                     }
                     else
                     {
-                        high = middle - 1;
+                        bad = probe;
+                        break;
                     }
                 }
-
-                break;
             }
 
+            int low = good + 1;
+            int high = Math.Min(max, bad - 1);
+            while (low <= high)
+            {
+                int middle = low + ((high - low) / 2);
+                probeCount = context.Count(start, boundaries[middle]);
+                if (probeCount <= tokenLimit)
+                {
+                    good = middle;
+                    goodCount = probeCount;
+                    low = middle + 1;
+                }
+                else
+                {
+                    high = middle - 1;
+                }
+            }
+
+            count = goodCount;
             return good;
         }
 

@@ -32,6 +32,12 @@ keyword, or sentence punctuation.
 `SentenceBased` splits on sentence boundaries and packs whole sentences up to the budget. Overlap is
 measured in whole sentences. A single sentence larger than the budget falls back to the token window.
 
+When a strategy has to split something that is only slightly over the budget (an oversized paragraph, page,
+sentence, or word) it does not leave a tiny remainder behind. If the last chunk of the split would hold under
+a quarter of the budget, it is re split with the chunk before it at the most even unit boundary, so a unit of
+260 tokens under a 254 token budget becomes two chunks of about 130 rather than 254 and 6. `FixedTokenCount`
+keeps uniform windows and does not do this, and neither does packing with overlap.
+
 `ParagraphBased` splits on blank lines and packs paragraphs. A paragraph larger than the budget falls back
 to sentence chunking, which in turn falls back to the token window. This is a good fit for prose where you
 want chunks to respect paragraph structure.

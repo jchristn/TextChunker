@@ -7,7 +7,8 @@ namespace TextChunker.Tokenization
 
     /// <summary>
     /// An immutable WordPiece vocabulary loaded from a one token per line vocab.txt file. Word initial pieces and
-    /// "##" continuation pieces are held in separate lookups so a candidate piece needs a single substring.
+    /// "##" continuation pieces are held in separate lookups and separate tries, so the longest match at a position
+    /// is found in one walk without allocating candidate substrings.
     /// </summary>
     internal sealed class WordPieceVocabulary
     {
@@ -16,16 +17,13 @@ namespace TextChunker.Tokenization
         private readonly Dictionary<string, int> _Initial;
         private readonly Dictionary<string, int> _Continuation;
         private readonly string[] _Tokens;
+        private readonly WordPieceTrie _InitialTrie = new WordPieceTrie();
+        private readonly WordPieceTrie _ContinuationTrie = new WordPieceTrie();
 
         /// <summary>
         /// Number of entries in the vocabulary.
         /// </summary>
         internal int Count => _Tokens.Length;
-
-        /// <summary>
-        /// Length in characters of the longest piece, excluding the continuation prefix.
-        /// </summary>
-        internal int MaxPieceLength { get; }
 
         private WordPieceVocabulary(string[] tokens)
         {
@@ -33,7 +31,6 @@ namespace TextChunker.Tokenization
             _Initial = new Dictionary<string, int>(tokens.Length, StringComparer.Ordinal);
             _Continuation = new Dictionary<string, int>(tokens.Length / 4, StringComparer.Ordinal);
 
-            int maxLength = 1;
             for (int i = 0; i < tokens.Length; i++)
             {
                 string token = tokens[i];
@@ -41,16 +38,14 @@ namespace TextChunker.Tokenization
                 {
                     string piece = token.Substring(_ContinuationPrefix.Length);
                     if (!_Continuation.ContainsKey(piece)) _Continuation[piece] = i;
-                    if (piece.Length > maxLength) maxLength = piece.Length;
+                    _ContinuationTrie.Add(piece, i);
                 }
                 else
                 {
                     if (!_Initial.ContainsKey(token)) _Initial[token] = i;
-                    if (token.Length > maxLength) maxLength = token.Length;
+                    _InitialTrie.Add(token, i);
                 }
             }
-
-            MaxPieceLength = maxLength;
         }
 
         /// <summary>
@@ -90,6 +85,32 @@ namespace TextChunker.Tokenization
         internal bool TryGetInitial(string piece, out int id)
         {
             return _Initial.TryGetValue(piece, out id);
+        }
+
+        /// <summary>
+        /// Find the longest word initial piece that matches text at start.
+        /// </summary>
+        /// <param name="text">Text to match.</param>
+        /// <param name="start">Inclusive start index.</param>
+        /// <param name="end">Exclusive limit index.</param>
+        /// <param name="id">Identifier of the match, or -1.</param>
+        /// <returns>The exclusive end index of the match, or -1 when nothing matches.</returns>
+        internal int MatchInitial(string text, int start, int end, out int id)
+        {
+            return _InitialTrie.LongestMatch(text, start, end, out id);
+        }
+
+        /// <summary>
+        /// Find the longest continuation piece (without its "##" prefix) that matches text at start.
+        /// </summary>
+        /// <param name="text">Text to match.</param>
+        /// <param name="start">Inclusive start index.</param>
+        /// <param name="end">Exclusive limit index.</param>
+        /// <param name="id">Identifier of the match, or -1.</param>
+        /// <returns>The exclusive end index of the match, or -1 when nothing matches.</returns>
+        internal int MatchContinuation(string text, int start, int end, out int id)
+        {
+            return _ContinuationTrie.LongestMatch(text, start, end, out id);
         }
 
         /// <summary>

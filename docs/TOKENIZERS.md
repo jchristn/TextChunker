@@ -117,7 +117,9 @@ adapter matches Ollama and Hugging Face on the inputs above, but some configurat
   models, for example, use an XLM-R SentencePiece tokenizer. Wrap the real tokenizer in
   `MlTokenizerAdapter` for exact counts.
 - Runtimes that normalize differently from Hugging Face, such as the Devanagari case above, or that add
-  instruction prefixes (`search_document: `) the chunker does not see.
+  instruction prefixes (`search_document: `) the chunker does not see. Precomposed Korean Hangul syllables
+  are another: accent stripping decomposes each into jamo, as Hugging Face does, which costs one token more
+  per syllable than Ollama charges. In both cases the local count is the higher one.
 - cl100k used as an approximation for a model with its own tokenizer, such as Gemini.
 
 For those cases, hold back a margin and handle an overflow response from the runtime:

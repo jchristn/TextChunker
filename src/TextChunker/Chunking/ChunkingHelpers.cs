@@ -26,8 +26,11 @@ namespace TextChunker.Chunking
         /// <param name="context">Chunking context.</param>
         /// <param name="range">Range of the source to chunk.</param>
         /// <param name="tokenLimit">Maximum tokens per chunk.</param>
+        /// <param name="balanceTail">When true and there is no overlap, a final chunk under a quarter of the budget is
+        /// evened out with the chunk before it, so splitting something slightly over budget does not leave a tiny
+        /// fragment. The FixedTokenCount strategy passes false to keep uniform windows.</param>
         /// <returns>Chunk spans in source order with strictly increasing starts and ends.</returns>
-        internal static List<SourceSpan> ChunkByTokenWindow(ChunkingContext context, SourceSpan range, int tokenLimit)
+        internal static List<SourceSpan> ChunkByTokenWindow(ChunkingContext context, SourceSpan range, int tokenLimit, bool balanceTail = true)
         {
             List<SourceSpan> spans = new List<SourceSpan>();
             if (range.Length <= 0 || tokenLimit <= 0) return spans;
@@ -36,11 +39,13 @@ namespace TextChunker.Chunking
             int count = units.Count;
             if (count == 0) return spans;
 
+            int[] starts = new int[count];
             int[] ends = new int[count];
             int[] estimates = new int[count];
             long totalTokens = 0;
             for (int i = 0; i < count; i++)
             {
+                starts[i] = units[i].Start;
                 ends[i] = units[i].End;
                 estimates[i] = units[i].Tokens;
                 totalTokens += units[i].Tokens;
@@ -51,6 +56,8 @@ namespace TextChunker.Chunking
 
             int start = 0;
             int previousEnd = 0;
+            int previousStart = -1;
+            int lastStart = -1;
             while (start < count)
             {
                 int end = FitPrefix(context, units[start].Start, ends, estimates, start, count, tokenLimit);
@@ -64,11 +71,16 @@ namespace TextChunker.Chunking
                 }
 
                 spans.Add(new SourceSpan(units[start].Start, units[end - 1].End));
+                previousStart = lastStart;
+                lastStart = start;
                 previousEnd = end;
                 if (end >= count) break;
 
                 start = NextWindowStart(context, units, start, end, overlapTokens);
             }
+
+            if (balanceTail && overlapTokens <= 0 && previousStart >= 0)
+                BalanceTail(context, spans, starts, ends, previousStart, lastStart, count, tokenLimit);
 
             return spans;
         }
@@ -98,21 +110,28 @@ namespace TextChunker.Chunking
             if (units == null || units.Count == 0 || tokenLimit <= 0) return spans;
 
             int count = units.Count;
+            int[] starts = new int[count];
             int[] ends = new int[count];
             int[] counts = new int[count];
             for (int i = 0; i < count; i++)
             {
+                starts[i] = units[i].Start;
                 ends[i] = units[i].End;
                 counts[i] = context.Count(units[i]);
             }
 
+            // First unit of each packed chunk, parallel to spans; -1 marks a chunk from the oversized handler.
+            List<int> spanFirstUnit = new List<int>();
             int index = 0;
             int previousEnd = 0;
             while (index < count)
             {
                 if (counts[index] > tokenLimit)
                 {
-                    spans.AddRange(oversizedUnitHandler(units[index]));
+                    if (overlapUnits <= 0) BalancePackedTail(context, spans, spanFirstUnit, starts, ends, index, tokenLimit);
+                    List<SourceSpan> oversized = oversizedUnitHandler(units[index]);
+                    spans.AddRange(oversized);
+                    for (int i = 0; i < oversized.Count; i++) spanFirstUnit.Add(-1);
                     index++;
                     previousEnd = Math.Max(previousEnd, index);
                     continue;
@@ -129,6 +148,7 @@ namespace TextChunker.Chunking
                 }
 
                 spans.Add(new SourceSpan(units[index].Start, units[end - 1].End));
+                spanFirstUnit.Add(index);
                 previousEnd = end;
                 if (end >= count) break;
 
@@ -143,6 +163,7 @@ namespace TextChunker.Chunking
                 }
             }
 
+            if (overlapUnits <= 0) BalancePackedTail(context, spans, spanFirstUnit, starts, ends, count, tokenLimit);
             return spans;
         }
 
@@ -453,6 +474,58 @@ namespace TextChunker.Chunking
             }
 
             return good;
+        }
+
+        private static void BalancePackedTail(ChunkingContext context, List<SourceSpan> spans, List<int> spanFirstUnit, int[] starts, int[] ends, int groupEnd, int tokenLimit)
+        {
+            // A run of packed units ends at an oversized unit or at the end of the input. When its last two chunks
+            // are consecutive packed chunks, the last one is the greedy remainder and may be tiny.
+            int last = spans.Count - 1;
+            if (last < 1 || spanFirstUnit[last] < 0 || spanFirstUnit[last - 1] < 0) return;
+            if (spans[last].End != ends[groupEnd - 1]) return;
+
+            int first = spanFirstUnit[last - 1];
+            int tail = spanFirstUnit[last];
+            int balanced = BalanceTail(context, spans, starts, ends, first, tail, groupEnd, tokenLimit);
+            spanFirstUnit[last] = balanced;
+        }
+
+        private static int BalanceTail(ChunkingContext context, List<SourceSpan> spans, int[] starts, int[] ends, int firstUnit, int tailUnit, int endUnit, int tokenLimit)
+        {
+            // Re split units [firstUnit, endUnit), currently cut at tailUnit, at the unit boundary that makes the two
+            // halves most even, when the tail is under a quarter of the budget and both halves still fit. Returns the
+            // unit where the final chunk now starts.
+            if (endUnit - firstUnit < 2 || tailUnit <= firstUnit) return tailUnit;
+            int tailTokens = context.Count(starts[tailUnit], ends[endUnit - 1]);
+            if (tailTokens * 4 >= tokenLimit) return tailUnit;
+
+            int low = firstUnit + 1;
+            int high = tailUnit;
+            while (low < high)
+            {
+                int middle = low + ((high - low) / 2);
+                if (context.Count(starts[firstUnit], ends[middle - 1]) >= context.Count(starts[middle], ends[endUnit - 1])) high = middle;
+                else low = middle + 1;
+            }
+
+            int best = tailUnit;
+            int bestLargest = Math.Max(context.Count(starts[firstUnit], ends[tailUnit - 1]), tailTokens);
+            for (int candidate = Math.Max(firstUnit + 1, low - 1); candidate <= Math.Min(tailUnit, low); candidate++)
+            {
+                int left = context.Count(starts[firstUnit], ends[candidate - 1]);
+                int right = context.Count(starts[candidate], ends[endUnit - 1]);
+                int largest = Math.Max(left, right);
+                if (left <= tokenLimit && right <= tokenLimit && largest < bestLargest)
+                {
+                    best = candidate;
+                    bestLargest = largest;
+                }
+            }
+
+            if (best == tailUnit) return tailUnit;
+            spans[spans.Count - 2] = new SourceSpan(starts[firstUnit], ends[best - 1]);
+            spans[spans.Count - 1] = new SourceSpan(starts[best], ends[endUnit - 1]);
+            return best;
         }
 
         private static int NextWindowStart(ChunkingContext context, List<TokenUnit> units, int start, int end, int overlapTokens)

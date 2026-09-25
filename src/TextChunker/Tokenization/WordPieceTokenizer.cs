@@ -189,30 +189,25 @@ namespace TextChunker.Tokenization
 
         private int SegmentWord(string word, List<int> starts, List<int> ends, List<WordPieceToken>? output)
         {
+            // Most words are a single vocabulary entry, and the word string already exists, so try it whole first.
+            if (_Vocabulary.TryGetInitial(word, out int wholeId))
+            {
+                output?.Add(new WordPieceToken(wholeId, starts[0], ends[ends.Count - 1]));
+                return 1;
+            }
+
             int rollback = output?.Count ?? 0;
             int produced = 0;
             int start = 0;
 
             while (start < word.Length)
             {
-                int end = Math.Min(word.Length, start + _Vocabulary.MaxPieceLength);
-                if (end < word.Length && end > start + 1 && char.IsHighSurrogate(word[end - 1]) && char.IsLowSurrogate(word[end]))
-                    end--;
+                int id;
+                int end = start == 0
+                    ? _Vocabulary.MatchInitial(word, start, word.Length, out id)
+                    : _Vocabulary.MatchContinuation(word, start, word.Length, out id);
 
-                int id = -1;
-                while (end > start)
-                {
-                    string piece = word.Substring(start, end - start);
-                    bool found = start == 0
-                        ? _Vocabulary.TryGetInitial(piece, out id)
-                        : _Vocabulary.TryGetContinuation(piece, out id);
-                    if (found) break;
-
-                    id = -1;
-                    end -= end - 2 >= start && char.IsLowSurrogate(word[end - 1]) && char.IsHighSurrogate(word[end - 2]) ? 2 : 1;
-                }
-
-                if (id < 0)
+                if (end < 0)
                 {
                     if (output != null)
                     {

@@ -5,6 +5,27 @@ All notable changes to TextChunker are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the version is below 1.0.0, any
 release may carry breaking changes.
 
+## [0.3.1] - 2026-09-24
+
+Fixes found by validating 0.3.0 against 205 real documents (PDF, DOCX, PPTX, XLSX, CSV, Parquet, HTML, XML,
+JSON, RTF, PostScript, base64, and plain text, 91 MB in all) under eight chunking configurations, with 2,993
+chunks sent to Ollama `all-minilm` and `nomic-embed-text` with truncation disabled. No chunk was rejected, no
+local count was below the runtime count, and 98.8 percent of counts matched exactly.
+
+### Fixed
+
+- Splitting a unit that is only slightly over the budget no longer leaves a tiny trailing fragment. When an
+  oversized paragraph, page, sentence, or word is split, or a run of packed units ends, and the final chunk
+  would hold under a quarter of the budget, it is re split with the chunk before it at the most even unit
+  boundary. Fragments such as a lone "higher." or "available for every anesthetic procedure" made up about
+  0.6 percent of chunks from the unit strategies on real documents. The `FixedTokenCount` strategy keeps
+  uniform windows and is unchanged, and packing with overlap is unchanged.
+- Very long unbroken words (base64 blobs, data URIs, minified content) no longer make chunking slow. WordPiece
+  lookup uses a character trie instead of trying candidate substrings, and an oversized word is split by
+  jumping to the estimated fill point instead of growing from one token. An 800 KB base64 run now chunks in
+  about 2 seconds instead of 17 under WordPiece and 1.5 seconds instead of 25 under `nomic-embed-text`. Token
+  output is identical: the identifiers match 0.3.0 across 8.5 million tokens of real documents.
+
 ## [0.3.0] - 2026-09-24
 
 This release replaces the token slicing core. Every text strategy now works on spans of the original source

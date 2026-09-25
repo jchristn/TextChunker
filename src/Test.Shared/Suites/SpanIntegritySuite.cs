@@ -268,6 +268,51 @@ namespace Test.Shared.Suites
                             return Task.CompletedTask;
                         }),
 
+                    new TestCaseDescriptor("SpanIntegrity", "SplitTailsAreBalanced", "Splitting a unit slightly over budget leaves no tiny trailing fragment",
+                        executeAsync: ct =>
+                        {
+                            // One paragraph a little over the budget, followed by another paragraph: the greedy split
+                            // would leave a few words behind, and balancing evens the two halves out instead.
+                            StringBuilder builder = new StringBuilder();
+                            for (int i = 0; i < 12; i++)
+                                builder.Append("Sentence ").Append(i).Append(" of the long paragraph adds a few more words. ");
+                            string source = builder.ToString().TrimEnd() + "\n\nA second paragraph follows the long one.";
+                            int budget = TestSupport.Chunk(source.Substring(0, source.IndexOf("\n\n", StringComparison.Ordinal)), new ChunkingOptions { MaxTokens = 4096 })[0].TokenCount - 6;
+
+                            foreach (ChunkStrategyEnum strategy in new[] { ChunkStrategyEnum.ParagraphBased, ChunkStrategyEnum.Recursive })
+                            {
+                                IReadOnlyList<Chunk> chunks = TestSupport.Chunk(source, new ChunkingOptions { Strategy = strategy, MaxTokens = budget });
+                                TestSupport.AssertSpanIntegrity(strategy.ToString(), source, chunks, budget, true);
+                                TestSupport.Assert(chunks.Count == 3, strategy + ": expected the long paragraph in two chunks plus the short one, got " + chunks.Count);
+                                TestSupport.Assert(chunks[1].TokenCount * 4 >= budget, strategy + ": the split left a tiny fragment of " + chunks[1].TokenCount + " tokens");
+                                TestSupport.Assert(Math.Abs(chunks[0].TokenCount - chunks[1].TokenCount) <= budget / 4, strategy + ": the two halves are uneven");
+                            }
+
+                            // An unbroken run (hex, base64) longer than the budget is split into pieces; whatever its length,
+                            // the final piece is evened out rather than left as a fragment.
+                            StringBuilder hex = new StringBuilder();
+                            Random random = new Random(7);
+                            while (hex.Length < 2400) hex.Append("0123456789ABCDEF"[random.Next(16)]);
+                            foreach (TextChunker.Tokenization.ITokenizerAdapter tokenizer in new TextChunker.Tokenization.ITokenizerAdapter[] { new TextChunker.Tokenization.SharpTokenTokenizerAdapter("cl100k_base"), new TextChunker.Tokenization.BertWordPieceTokenizerAdapter() })
+                            {
+                                for (int length = 300; length <= 2400; length += 37)
+                                {
+                                    string run = hex.ToString(0, length);
+                                    IReadOnlyList<Chunk> pieces = TestSupport.Chunk(tokenizer, run, new ChunkingOptions { MaxTokens = 64 });
+                                    TestSupport.AssertSpanIntegrity("hex " + length, run, pieces, 64, true);
+                                    if (pieces.Count < 2) continue;
+                                    foreach (Chunk piece in pieces)
+                                        TestSupport.Assert(piece.TokenCount * 4 >= 64, tokenizer.GetType().Name + " hex run of " + length + " left a fragment of " + piece.TokenCount + " tokens");
+                                }
+                            }
+
+                            IReadOnlyList<Chunk> fixedWindows = TestSupport.Chunk(TestSupport.WordCorpus(70), new ChunkingOptions { MaxTokens = 64 });
+                            TestSupport.Assert(fixedWindows.Count == 3, "fixed windows should stay uniform, got " + fixedWindows.Count);
+                            TestSupport.Assert(fixedWindows[0].TokenCount == 64 && fixedWindows[1].TokenCount == 64, "fixed windows before the last should be full");
+                            TestSupport.Assert(fixedWindows[2].TokenCount < 16, "the FixedTokenCount strategy keeps its short final window");
+                            return Task.CompletedTask;
+                        }),
+
                     new TestCaseDescriptor("SpanIntegrity", "ContainmentBackstopNeverFires", "The containment backstop records no suppressed chunks across a sweep",
                         executeAsync: ct =>
                         {
