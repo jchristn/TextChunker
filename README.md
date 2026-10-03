@@ -207,7 +207,8 @@ source offsets unless the breadcrumb is prepended to their text.
 
 Register the chunker once and inject `IChunker` wherever you need it. `AddTextChunker` registers a single
 `Chunker` as a singleton; it holds no per-call state and is safe to share across threads. It depends only
-on `Microsoft.Extensions.DependencyInjection.Abstractions`, so it pulls in no DI runtime of its own.
+on `Microsoft.Extensions.DependencyInjection.Abstractions` (10.0 or later), so it pulls in no DI runtime of its
+own.
 
 ```csharp
 using Microsoft.Extensions.DependencyInjection;

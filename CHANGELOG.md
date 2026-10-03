@@ -5,6 +5,24 @@ All notable changes to TextChunker are documented here. The format follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html). While the version is below 1.0.0, any
 release may carry breaking changes.
 
+## [0.3.2] - 2026-10-03
+
+Dependency update release. Chunking behavior, token counts, and chunk boundaries are unchanged; the golden
+parity fixture passes without re approval.
+
+### Changed
+
+- `Microsoft.Extensions.DependencyInjection.Abstractions` 8.0.2 to 10.0.12. Applications that reference this
+  package directly now resolve 10.0.12 or later. The 10.x package still supports net8.0 and netstandard2.0.
+- netstandard2.0 polyfills: `Microsoft.Bcl.AsyncInterfaces`, `System.Text.Json`, and
+  `System.Diagnostics.DiagnosticSource` 9.0.4 to 10.0.12, and `Microsoft.Bcl.Memory` 9.0.14 to 10.0.12
+  (still overriding the vulnerable 9.0.4 pulled transitively by `Microsoft.ML.Tokenizers`).
+- `TextChunker.Extensions.DataIngestion`: `Microsoft.Extensions.DataIngestion.Abstractions`
+  10.9.0-preview.1.26411.16 to 10.10.0-preview.1.26459.2. No adapter changes were needed.
+- Test and tooling dependencies: Touchstone 0.1.12 to 0.2.0, NUnit 4.6.1 to 5.0.0, NUnit.Analyzers 4.14.0
+  to 4.15.0, NUnit3TestAdapter 6.2.0 to 6.3.0, Microsoft.NET.Test.Sdk 18.9.0 to 18.10.1, coverlet.collector
+  10.0.1 to 10.1.0, and BenchmarkDotNet 0.14.0 to 0.15.8.
+
 ## [0.3.1] - 2026-09-24
 
 Fixes found by validating 0.3.0 against 205 real documents (PDF, DOCX, PPTX, XLSX, CSV, Parquet, HTML, XML,
